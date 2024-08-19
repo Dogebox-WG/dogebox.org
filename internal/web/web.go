@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -63,19 +64,26 @@ type CreateResponse struct {
 }
 
 func (a *WebAPI) create(w http.ResponseWriter, r *http.Request) {
+	options := "POST, OPTIONS"
 	if r.Method == http.MethodPost {
 		// request
 		_, err := io.ReadAll(r.Body)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("bad request: %v", err), http.StatusBadRequest)
+			sendError(w, http.StatusBadRequest, "bad-request", fmt.Sprintf("bad request: %v", err), options)
 			return
 		}
 
+		// generate the new key
+		nodeKey, err := dnet.GenerateKeyPair()
+		if err != nil {
+			sendError(w, http.StatusFailedDependency, "bad-key", fmt.Sprintf("cannot generate key: %v", err), options)
+		}
+
 		// response
-		res := CreateResponse{}
-		sendJson(w, res, "POST, OPTIONS")
+		res := CreateResponse{Words: []string{hex.EncodeToString(nodeKey.Pub)}}
+		sendJson(w, res, options)
 	} else {
-		options(w, r, "POST, OPTIONS")
+		sendOptions(w, r, options)
 	}
 }
 
@@ -88,25 +96,26 @@ type LoginResponse struct {
 }
 
 func (a *WebAPI) login(w http.ResponseWriter, r *http.Request) {
+	options := "POST, OPTIONS"
 	if r.Method == http.MethodPost {
 		// request
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("bad request: %v", err), http.StatusBadRequest)
+			sendError(w, http.StatusBadRequest, "bad-request", fmt.Sprintf("bad request: %v", err), options)
 			return
 		}
 		var args LoginRequest
 		err = json.Unmarshal(body, &args)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("error decoding JSON: %s", err.Error()), http.StatusBadRequest)
+			sendError(w, http.StatusInternalServerError, "json", fmt.Sprintf("deconding JSON: %s", err.Error()), options)
 			return
 		}
 
 		// response
 		res := LoginResponse{}
-		sendJson(w, res, "POST, OPTIONS")
+		sendJson(w, res, options)
 	} else {
-		options(w, r, "POST, OPTIONS")
+		sendOptions(w, r, options)
 	}
 }
 
@@ -120,41 +129,60 @@ type ChangePassResponse struct {
 }
 
 func (a *WebAPI) changePassword(w http.ResponseWriter, r *http.Request) {
+	options := "POST, OPTIONS"
 	if r.Method == http.MethodPost {
 		// request
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("bad request: %v", err), http.StatusBadRequest)
+			sendError(w, http.StatusBadRequest, "bad-request", fmt.Sprintf("bad request: %v", err), options)
 			return
 		}
 		var args ChangePassRequest
 		err = json.Unmarshal(body, &args)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("error decoding JSON: %s", err.Error()), http.StatusBadRequest)
+			sendError(w, http.StatusInternalServerError, "json", fmt.Sprintf("deconding JSON: %s", err.Error()), options)
 			return
 		}
 
 		// response
 		res := ChangePassResponse{}
-		sendJson(w, res, "POST, OPTIONS")
+		sendJson(w, res, options)
 	} else {
-		options(w, r, "POST, OPTIONS")
+		sendOptions(w, r, options)
 	}
 }
 
-func sendJson(w http.ResponseWriter, res any, allow string) {
+func sendJson(w http.ResponseWriter, res any, options string) {
 	bytes, err := json.Marshal(res)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("error encoding JSON: %s", err.Error()), http.StatusInternalServerError)
+		sendError(w, http.StatusInternalServerError, "json", fmt.Sprintf("encoding JSON: %s", err.Error()), options)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Length", strconv.Itoa(len(bytes)))
-	w.Header().Set("Allow", allow)
+	w.Header().Set("Allow", options)
 	w.Write(bytes)
 }
 
-func options(w http.ResponseWriter, r *http.Request, options string) {
+type WebError struct {
+	Error  string `json:"error"`
+	Reason string `json:"reason"`
+}
+
+func sendError(w http.ResponseWriter, statusCode int, code string, reason string, options string) {
+	bytes, err := json.Marshal(WebError{Error: code, Reason: reason})
+	if err != nil {
+		bytes = []byte(fmt.Sprintf("{\"error\":\"json\",\"reason\":\"encoding JSON: %s\"}", err.Error()))
+		statusCode = http.StatusInternalServerError
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(bytes)))
+	w.Header().Set("Allow", options)
+	w.WriteHeader(statusCode)
+	w.Write(bytes)
+}
+
+func sendOptions(w http.ResponseWriter, r *http.Request, options string) {
 	switch r.Method {
 	case http.MethodOptions:
 		w.Header().Set("Allow", options)
