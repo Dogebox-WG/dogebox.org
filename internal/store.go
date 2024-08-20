@@ -1,4 +1,4 @@
-package spec
+package internal
 
 import (
 	"context"
@@ -11,4 +11,6 @@ type Store interface {
 
 // StoreCtx is a Store bound to a cancellable Context
 type StoreCtx interface {
+	SetMaster(salt []byte, nonce []byte, encrypted []byte) error
+	GetMaster() (salt []byte, nonce []byte, encrypted []byte, err error)
 }

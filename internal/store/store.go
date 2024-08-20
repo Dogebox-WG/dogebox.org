@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"code.dogecoin.org/dkm/internal/spec"
+	"code.dogecoin.org/dkm/internal"
 	"github.com/mattn/go-sqlite3"
 )
 
@@ -19,7 +19,7 @@ type SQLiteStoreCtx struct {
 	ctx context.Context
 }
 
-func New() spec.Store {
+func New() internal.Store {
 	return &SQLiteStore{}
 }
 
@@ -27,7 +27,7 @@ func (s *SQLiteStore) Close() {
 	s.db.Close()
 }
 
-func (s *SQLiteStore) WithCtx(ctx context.Context) spec.StoreCtx {
+func (s *SQLiteStore) WithCtx(ctx context.Context) internal.StoreCtx {
 	return &SQLiteStoreCtx{
 		_db: s.db,
 		ctx: ctx,
@@ -110,3 +110,11 @@ func dbErr(err error, where string) error {
 }
 
 // STORE INTERFACE
+
+func (s SQLiteStoreCtx) SetMaster(salt []byte, nonce []byte, encrypted []byte) error {
+	return nil
+}
+
+func (s SQLiteStoreCtx) GetMaster() (salt []byte, nonce []byte, encrypted []byte, err error) {
+	return nil, nil, nil, nil
+}
