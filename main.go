@@ -14,6 +14,7 @@ import (
 )
 
 const WebAPIDefaultPort = 8089
+const DBFilePath = "storage/dkm.db"
 
 func main() {
 	var bind dnet.Address
@@ -31,7 +32,10 @@ func main() {
 	}
 
 	gov := governor.New().CatchSignals().Restart(1 * time.Second)
-	db := store.New()
+	db, err := store.New(DBFilePath)
+	if err != nil {
+		panic(err)
+	}
 
 	// start the web server.
 	gov.Add("dkm", web.New(bind, db))

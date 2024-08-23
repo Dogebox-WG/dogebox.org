@@ -12,6 +12,14 @@ import (
 	"github.com/mattn/go-sqlite3"
 )
 
+const SQL_SCHEMA string = `
+CREATE TABLE IF NOT EXISTS config (
+	s1 BLOB NOT NULL,
+	s2 BLOB NOT NULL,
+	enc BLOB NOT NULL
+);
+`
+
 type SQLiteStore struct {
 	db *sql.DB
 }
@@ -21,8 +29,25 @@ type SQLiteStoreCtx struct {
 	ctx context.Context
 }
 
-func New() internal.Store {
-	return &SQLiteStore{}
+func New(filename string) (internal.Store, error) {
+	backend := "sqlite3"
+	db, err := sql.Open(backend, filename)
+	store := &SQLiteStore{db: db}
+	if err != nil {
+		return store, dbErr(err, "opening database")
+	}
+	setup_sql := SQL_SCHEMA
+	if backend == "sqlite3" {
+		// limit concurrent access until we figure out a way to start transactions
+		// with the BEGIN CONCURRENT statement in Go.
+		db.SetMaxOpenConns(1)
+	}
+	// init tables / indexes
+	_, err = db.Exec(setup_sql)
+	if err != nil {
+		return store, dbErr(err, "creating database schema")
+	}
+	return store, err
 }
 
 func (s *SQLiteStore) Close() {
@@ -113,9 +138,22 @@ func dbErr(err error, where string) error {
 
 // STORE INTERFACE
 
-func (s SQLiteStoreCtx) SetMaster(salt []byte, nonce []byte, encrypted []byte) error {
-	log.Printf("storing: %v %v %v", hex.EncodeToString(salt), hex.EncodeToString(nonce), hex.EncodeToString(encrypted))
-	return nil
+func (s SQLiteStoreCtx) SetMaster(s1 []byte, s2 []byte, enc []byte) error {
+	log.Printf("storing: %v %v %v", hex.EncodeToString(s1), hex.EncodeToString(s2), hex.EncodeToString(enc))
+	return s.doTxn("SetMaster", func(tx *sql.Tx) error {
+		res, err := tx.Exec("UPDATE config SET s1=?,s2=?,enc=?", s1, s2, enc)
+		if err != nil {
+			return err
+		}
+		num, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if num == 0 {
+			_, err = tx.Exec("INSERT INTO config (s1,s2,enc) VALUES (?,?,?)", s1, s2, enc)
+		}
+		return err
+	})
 }
 
 func (s SQLiteStoreCtx) GetMaster() (salt []byte, nonce []byte, encrypted []byte, err error) {

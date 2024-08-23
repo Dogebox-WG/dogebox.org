@@ -8,6 +8,7 @@ dkm: clean
 	go build -o dkm .
 
 dev:
+	mkdir -p storage
 	go run .
 
 test:

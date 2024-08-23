@@ -11,6 +11,6 @@ type Store interface {
 
 // StoreCtx is a Store bound to a cancellable Context
 type StoreCtx interface {
-	SetMaster(salt []byte, nonce []byte, encrypted []byte) error
-	GetMaster() (salt []byte, nonce []byte, encrypted []byte, err error)
+	SetMaster(s1 []byte, s2 []byte, enc []byte) error
+	GetMaster() (s1 []byte, s2 []byte, enc []byte, err error)
 }
