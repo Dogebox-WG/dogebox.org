@@ -1,10 +1,12 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -15,6 +17,7 @@ import (
 	"code.dogecoin.org/dkm/internal"
 	"code.dogecoin.org/gossip/dnet"
 	"code.dogecoin.org/governor"
+	"github.com/dogeorg/doge/bip39"
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/chacha20poly1305"
 )
@@ -101,45 +104,52 @@ func (a *WebAPI) create(w http.ResponseWriter, r *http.Request) {
 			sendError(w, http.StatusServiceUnavailable, "entropy", fmt.Sprintf("insufficient entropy: %v", err), options)
 		}
 
-		// argon2 KDF
-		pwdKey := argon2.IDKey([]byte(args.Phrase), salt[:], 1, 256*1024, 4, chacha20poly1305.KeySize)
-
-		// generate the new key
-		nodeKey, err := dnet.GenerateKeyPair()
+		// generate mnemonic phrase
+		mnemonic, seed, err := bip39.GenerateRandomMnemonic(256, args.Phrase, bip39.EnglishWordList)
 		if err != nil {
-			memZero(pwdKey)
-			sendError(w, http.StatusInternalServerError, "bad-key", fmt.Sprintf("cannot generate key: %v", err), options)
+			sendError(w, http.StatusServiceUnavailable, codeForErr(err), err.Error(), options)
 		}
+
+		// ensure mnemonic phrase can be used later
+		seed2, err := bip39.SeedFromMnemonic(mnemonic, args.Phrase, bip39.EnglishWordList)
+		if err != nil {
+			sendError(w, http.StatusServiceUnavailable, codeForErr(err), err.Error(), options)
+		}
+		if !bytes.Equal(seed, seed2) {
+			memZero(seed)
+			memZero(seed2)
+			sendError(w, http.StatusServiceUnavailable, "error", "bug: generated mnemonic did not round-trip", options)
+		}
+		memZero(seed2)
+
+		// verify the generated seed produces a valid key
+		nodeKey := dnet.KeyPairFromSeed(seed[0:32])
+		memZero(seed)
 		log.Printf("generated: %v", hex.EncodeToString(nodeKey.Pub))
 
 		// encrypt the private key with the password key
+		pwdKey := argon2.IDKey([]byte(args.Phrase), salt[:], 1, 64*1024, 4, chacha20poly1305.KeySize)
 		aead, err := chacha20poly1305.NewX(pwdKey[:])
+		memZero(pwdKey)
 		if err != nil {
-			memZero(pwdKey)
 			sendError(w, http.StatusInternalServerError, "encrypt", fmt.Sprintf("cannot encrypt key: %v", err), options)
 		}
-		dst := make([]byte, 0, len(nodeKey.Priv))
-		encrypted := aead.Seal(dst, nonce[:], nodeKey.Priv, nil)
-
-		// clear the key
+		encrypted := make([]byte, 0, len(nodeKey.Priv))
+		encrypted = aead.Seal(encrypted, nonce[:], nodeKey.Priv, nil)
 		memZero(nodeKey.Priv)
 		memZero(nodeKey.Pub)
 
 		// store the password nonce, master-key nonce, encrypted master-key
 		err = a.cstore.SetMaster(salt[:], nonce[:], encrypted)
-
-		// clear encryption buffers
 		memZero(encrypted)
 		memZero(nonce[:])
 		memZero(salt[:])
-		memZero(pwdKey)
-
 		if err != nil {
 			sendError(w, http.StatusInternalServerError, "bad-key", fmt.Sprintf("cannot generate key: %v", err), options)
 		}
 
 		// response
-		res := CreateResponse{Seedphrase: []string{"bing", "bop", "boop", "lorem", "ipsum", "blend", "twenty", "drinks", "blend", "forty", "three", "mostly", "under", "thesun", "fifteen", "five", "ohnoes", "rowing", "flipper", "flour", "fifty", "tiny", "sunny", "flower"}}
+		res := CreateResponse{Seedphrase: mnemonic}
 		sendJson(w, res, options)
 	} else {
 		sendOptions(w, r, options)
@@ -322,4 +332,23 @@ func sendOptions(w http.ResponseWriter, r *http.Request, options string) {
 		w.Header().Set("Allow", options)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func codeForErr(err error) string {
+	if errors.Is(err, bip39.ErrBadEntropy) {
+		return "range"
+	}
+	if errors.Is(err, bip39.ErrOutOfEntropy) {
+		return "entropy"
+	}
+	if errors.Is(err, bip39.ErrWrongWord) {
+		return "wordlist"
+	}
+	if errors.Is(err, bip39.ErrWrongChecksum) {
+		return "checksum"
+	}
+	if errors.Is(err, bip39.ErrWrongLength) {
+		return "length"
+	}
+	return "error"
 }

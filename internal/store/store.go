@@ -3,7 +3,9 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
+	"log"
 	"time"
 
 	"code.dogecoin.org/dkm/internal"
@@ -112,6 +114,7 @@ func dbErr(err error, where string) error {
 // STORE INTERFACE
 
 func (s SQLiteStoreCtx) SetMaster(salt []byte, nonce []byte, encrypted []byte) error {
+	log.Printf("storing: %v %v %v", hex.EncodeToString(salt), hex.EncodeToString(nonce), hex.EncodeToString(encrypted))
 	return nil
 }
 
