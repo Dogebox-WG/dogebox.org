@@ -3,9 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
-	"encoding/hex"
 	"fmt"
-	"log"
 	"time"
 
 	"code.dogecoin.org/dkm/internal"
@@ -139,7 +137,6 @@ func dbErr(err error, where string) error {
 // STORE INTERFACE
 
 func (s SQLiteStoreCtx) SetMaster(s1 []byte, s2 []byte, enc []byte) error {
-	log.Printf("storing: %v %v %v", hex.EncodeToString(s1), hex.EncodeToString(s2), hex.EncodeToString(enc))
 	return s.doTxn("SetMaster", func(tx *sql.Tx) error {
 		res, err := tx.Exec("UPDATE config SET s1=?,s2=?,enc=?", s1, s2, enc)
 		if err != nil {
@@ -156,6 +153,10 @@ func (s SQLiteStoreCtx) SetMaster(s1 []byte, s2 []byte, enc []byte) error {
 	})
 }
 
-func (s SQLiteStoreCtx) GetMaster() (salt []byte, nonce []byte, encrypted []byte, err error) {
-	return nil, nil, nil, nil
+func (s SQLiteStoreCtx) GetMaster() (s1 []byte, s2 []byte, enc []byte, err error) {
+	err = s.doTxn("GetMaster", func(tx *sql.Tx) error {
+		row := tx.QueryRow("SELECT s1,s2,enc FROM config LIMIT 1")
+		return row.Scan(&s1, &s2, &enc)
+	})
+	return
 }

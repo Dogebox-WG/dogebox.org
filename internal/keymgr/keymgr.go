@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
-	"log"
+	"errors"
+	"time"
 
 	"code.dogecoin.org/dkm/internal"
 	"code.dogecoin.org/gossip/dnet"
@@ -16,15 +17,24 @@ import (
 
 var _ internal.KeyMgr = &keyMgr{}
 
+const SessionTime = 10 * 60 // seconds
+const HandoverTime = 30     // seconds
+
 type keyMgr struct {
-	store internal.StoreCtx
+	store    internal.StoreCtx
+	sessions map[string]time.Time
 }
 
 func New(store internal.StoreCtx) internal.KeyMgr {
-	return &keyMgr{store: store}
+	return &keyMgr{
+		store:    store,
+		sessions: make(map[string]time.Time),
+	}
 }
 
 var ErrOutOfEntropy, wrapOutOfEntropy = wrapped.New("not enough entropy available in the OS entropy pool")
+var ErrWrongPassword = errors.New("incorrect password")
+var ErrBadToken = errors.New("invalid or expired token")
 
 func (km *keyMgr) CreateKey(pass string) (mnemonic []string, err error) {
 	// generate salts
@@ -61,7 +71,6 @@ func (km *keyMgr) CreateKey(pass string) (mnemonic []string, err error) {
 	// verify the generated seed produces a valid key
 	nodeKey := dnet.KeyPairFromSeed(seed[0:32])
 	memZero(seed)
-	log.Printf("generated: %v", hex.EncodeToString(nodeKey.Pub))
 
 	// encrypt the private key with the password key
 	pwdKey := argon2.IDKey([]byte(pass), salt[:], 1, 64*1024, 4, chacha20poly1305.KeySize)
@@ -85,6 +94,74 @@ func (km *keyMgr) CreateKey(pass string) (mnemonic []string, err error) {
 	}
 
 	return mnemonic, nil
+}
+
+func (km *keyMgr) Auth(pass string) (valid bool, token string, ends int, err error) {
+	salt, nonce, enc, err := km.store.GetMaster()
+	if err != nil {
+		return
+	}
+	pwdKey := argon2.IDKey([]byte(pass), salt, 1, 64*1024, 4, chacha20poly1305.KeySize)
+	memZero(salt)
+	aead, err := chacha20poly1305.NewX(pwdKey[:])
+	if err != nil {
+		return
+	}
+	memZero(pwdKey)
+	var nodeKey dnet.KeyPair
+	decrypted := make([]byte, 0, len(nodeKey.Priv))
+	decrypted, err = aead.Open(decrypted, nonce, enc, nil)
+	memZero(nonce)
+	memZero(enc)
+	if err != nil {
+		// only errOpen "message authentication failed"
+		return false, "", 0, ErrWrongPassword
+	}
+	memZero(decrypted)
+	token, ends, err = km.newSession()
+	if err != nil {
+		return
+	}
+	return true, token, ends, nil
+}
+
+func (km *keyMgr) RollToken(token string) (newtoken string, ends int, err error) {
+	now := time.Now()
+	if ts, ok := km.sessions[token]; ok && ts.After(now) {
+		// keep the current token alive for a short handover time.
+		km.sessions[token] = now.Add(HandoverTime)
+		// issue a new token.
+		return km.newSession()
+	} else {
+		// the token has already expired.
+		delete(km.sessions, token)
+		return "", 0, ErrBadToken
+	}
+}
+
+func (km *keyMgr) LogOut(token string) {
+	// invalidate the token if it exists.
+	delete(km.sessions, token)
+}
+
+func (km *keyMgr) newSession() (token string, ends int, err error) {
+	// clean out expired tokens.
+	now := time.Now()
+	for key, ts := range km.sessions {
+		if ts.After(now) {
+			// seems safe: https://go.dev/doc/effective_go#for
+			delete(km.sessions, key)
+		}
+	}
+	// generate a cryptographically-secure random token.
+	tok := [16]byte{}
+	_, err = rand.Read(tok[:])
+	if err != nil {
+		return "", 0, ErrOutOfEntropy
+	}
+	token = hex.EncodeToString(tok[:])
+	km.sessions[token] = time.Now().Add(SessionTime * time.Second)
+	return token, SessionTime, nil
 }
 
 func memZero(to []byte) {

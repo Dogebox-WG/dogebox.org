@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"code.dogecoin.org/dkm/internal"
@@ -38,7 +39,8 @@ func New(bind dnet.Address, store internal.Store, keymgr internal.KeyMgr) govern
 	}
 	mux.HandleFunc("/create", a.create)
 	mux.HandleFunc("/login", a.login)
-	mux.HandleFunc("/exchange-token", a.exchangeToken)
+	mux.HandleFunc("/roll-token", a.rollToken)
+	mux.HandleFunc("/logout", a.logout)
 	mux.HandleFunc("/change-password", a.changePassword)
 	mux.HandleFunc("/recover-password", a.recoverPassword)
 
@@ -68,7 +70,7 @@ func (a *WebAPI) Stop() {
 // WEB API
 
 type CreateRequest struct {
-	Phrase string `json:"password"`
+	Password string `json:"password"`
 }
 type CreateResponse struct {
 	Seedphrase []string `json:"seedphrase"`
@@ -90,8 +92,15 @@ func (a *WebAPI) create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// validate password
+		pass := strings.TrimSpace(args.Password)
+		if len(pass) < 1 {
+			sendError(w, http.StatusInternalServerError, "password", "password is empty", options)
+			return
+		}
+
 		// generate the new key
-		mnemonic, err := a.keymgr.CreateKey(args.Phrase)
+		mnemonic, err := a.keymgr.CreateKey(pass)
 		if err != nil {
 			sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
 		}
@@ -108,8 +117,9 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 type LoginResponse struct {
-	Valid bool   `json:"valid"`
-	Token string `json:"token"`
+	Valid    bool   `json:"valid"`
+	Token    string `json:"token"`
+	ValidFor int    `json:"valid_for"`
 }
 
 func (a *WebAPI) login(w http.ResponseWriter, r *http.Request) {
@@ -128,23 +138,36 @@ func (a *WebAPI) login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// validate password
+		pass := strings.TrimSpace(args.Password)
+		if len(pass) < 1 {
+			sendError(w, http.StatusInternalServerError, "password", "password is empty", options)
+			return
+		}
+
+		valid, token, ends, err := a.keymgr.Auth(pass)
+		if err != nil {
+			sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
+		}
+
 		// response
-		res := LoginResponse{}
+		res := LoginResponse{Valid: valid, Token: token, ValidFor: ends}
 		sendJson(w, res, options)
 	} else {
 		sendOptions(w, r, options)
 	}
 }
 
-type ExchangeTokenRequest struct {
+type RollTokenRequest struct {
 	Token string `json:"token"`
 }
-type ExchangeTokenResponse struct {
+type RollTokenResponse struct {
 	Valid    bool   `json:"valid"`
 	NewToken string `json:"new_token"`
+	ValidFor int    `json:"valid_for"`
 }
 
-func (a *WebAPI) exchangeToken(w http.ResponseWriter, r *http.Request) {
+func (a *WebAPI) rollToken(w http.ResponseWriter, r *http.Request) {
 	options := "POST, OPTIONS"
 	if r.Method == http.MethodPost {
 		// request
@@ -153,15 +176,59 @@ func (a *WebAPI) exchangeToken(w http.ResponseWriter, r *http.Request) {
 			sendError(w, http.StatusBadRequest, "bad-request", fmt.Sprintf("bad request: %v", err), options)
 			return
 		}
-		var args ExchangeTokenRequest
+		var args RollTokenRequest
 		err = json.Unmarshal(body, &args)
 		if err != nil {
 			sendError(w, http.StatusInternalServerError, "json", fmt.Sprintf("decoding JSON: %v", err), options)
 			return
 		}
 
+		valid := true
+		newtoken, ends, err := a.keymgr.RollToken(args.Token)
+		if err != nil {
+			if err == keymgr.ErrBadToken {
+				valid = false
+				err = nil
+			} else {
+				sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
+				return
+			}
+		}
+
 		// response
-		res := ExchangeTokenResponse{}
+		res := RollTokenResponse{Valid: valid, NewToken: newtoken, ValidFor: ends}
+		sendJson(w, res, options)
+	} else {
+		sendOptions(w, r, options)
+	}
+}
+
+type LogOutRequest struct {
+	Token string `json:"token"`
+}
+type LogOutResponse struct {
+}
+
+func (a *WebAPI) logout(w http.ResponseWriter, r *http.Request) {
+	options := "POST, OPTIONS"
+	if r.Method == http.MethodPost {
+		// request
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			sendError(w, http.StatusBadRequest, "bad-request", fmt.Sprintf("bad request: %v", err), options)
+			return
+		}
+		var args LogOutRequest
+		err = json.Unmarshal(body, &args)
+		if err != nil {
+			sendError(w, http.StatusInternalServerError, "json", fmt.Sprintf("decoding JSON: %v", err), options)
+			return
+		}
+
+		a.keymgr.LogOut(args.Token)
+
+		// response
+		res := LogOutResponse{}
 		sendJson(w, res, options)
 	} else {
 		sendOptions(w, r, options)
