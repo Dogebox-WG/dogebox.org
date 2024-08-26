@@ -96,7 +96,7 @@ func (km *keyMgr) CreateKey(pass string) (mnemonic []string, err error) {
 	return mnemonic, nil
 }
 
-func (km *keyMgr) Auth(pass string) (valid bool, token string, ends int, err error) {
+func (km *keyMgr) Auth(pass string) (token string, ends int, err error) {
 	salt, nonce, enc, err := km.store.GetMaster()
 	if err != nil {
 		return
@@ -115,14 +115,14 @@ func (km *keyMgr) Auth(pass string) (valid bool, token string, ends int, err err
 	memZero(enc)
 	if err != nil {
 		// only errOpen "message authentication failed"
-		return false, "", 0, ErrWrongPassword
+		return "", 0, ErrWrongPassword
 	}
 	memZero(decrypted)
 	token, ends, err = km.newSession()
 	if err != nil {
 		return
 	}
-	return true, token, ends, nil
+	return token, ends, nil
 }
 
 func (km *keyMgr) RollToken(token string) (newtoken string, ends int, err error) {

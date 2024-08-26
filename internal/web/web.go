@@ -117,7 +117,6 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 type LoginResponse struct {
-	Valid    bool   `json:"valid"`
 	Token    string `json:"token"`
 	ValidFor int    `json:"valid_for"`
 }
@@ -145,13 +144,13 @@ func (a *WebAPI) login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		valid, token, ends, err := a.keymgr.Auth(pass)
+		token, ends, err := a.keymgr.Auth(pass)
 		if err != nil {
 			sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
 		}
 
 		// response
-		res := LoginResponse{Valid: valid, Token: token, ValidFor: ends}
+		res := LoginResponse{Token: token, ValidFor: ends}
 		sendJson(w, res, options)
 	} else {
 		sendOptions(w, r, options)
@@ -162,8 +161,7 @@ type RollTokenRequest struct {
 	Token string `json:"token"`
 }
 type RollTokenResponse struct {
-	Valid    bool   `json:"valid"`
-	NewToken string `json:"new_token"`
+	Token    string `json:"token"`
 	ValidFor int    `json:"valid_for"`
 }
 
@@ -183,20 +181,14 @@ func (a *WebAPI) rollToken(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		valid := true
 		newtoken, ends, err := a.keymgr.RollToken(args.Token)
 		if err != nil {
-			if err == keymgr.ErrBadToken {
-				valid = false
-				err = nil
-			} else {
-				sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
-				return
-			}
+			sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
+			return
 		}
 
 		// response
-		res := RollTokenResponse{Valid: valid, NewToken: newtoken, ValidFor: ends}
+		res := RollTokenResponse{Token: newtoken, ValidFor: ends}
 		sendJson(w, res, options)
 	} else {
 		sendOptions(w, r, options)
@@ -355,6 +347,12 @@ func codeForErr(err error) string {
 	}
 	if errors.Is(err, bip39.ErrWrongLength) {
 		return "length"
+	}
+	if errors.Is(err, keymgr.ErrBadToken) {
+		return "token"
+	}
+	if errors.Is(err, keymgr.ErrWrongPassword) {
+		return "password"
 	}
 	return "error"
 }
