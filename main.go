@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"code.dogecoin.org/dkm/internal/keymgr"
 	"code.dogecoin.org/dkm/internal/store"
 	"code.dogecoin.org/dkm/internal/web"
 	"code.dogecoin.org/gossip/dnet"
@@ -37,8 +38,10 @@ func main() {
 		panic(err)
 	}
 
+	km := keymgr.New(db.WithCtx(gov.GlobalContext()))
+
 	// start the web server.
-	gov.Add("dkm", web.New(bind, db))
+	gov.Add("dkm", web.New(bind, db, km))
 
 	// run services until interrupted.
 	gov.Start()
