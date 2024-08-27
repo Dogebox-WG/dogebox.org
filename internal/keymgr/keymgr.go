@@ -18,17 +18,22 @@ import (
 var _ internal.KeyMgr = &keyMgr{}
 
 const SessionTime = 10 * 60 // seconds
-const HandoverTime = 30     // seconds
+const HandoverTime = 10     // seconds
 
 type keyMgr struct {
 	store    internal.StoreCtx
-	sessions map[string]time.Time
+	sessions map[string]session
+}
+
+type session struct {
+	expires time.Time
+	rolled  bool
 }
 
 func New(store internal.StoreCtx) internal.KeyMgr {
 	return &keyMgr{
 		store:    store,
-		sessions: make(map[string]time.Time),
+		sessions: make(map[string]session),
 	}
 }
 
@@ -127,9 +132,10 @@ func (km *keyMgr) Auth(pass string) (token string, ends int, err error) {
 
 func (km *keyMgr) RollToken(token string) (newtoken string, ends int, err error) {
 	now := time.Now()
-	if ts, ok := km.sessions[token]; ok && ts.After(now) {
-		// keep the current token alive for a short handover time.
-		km.sessions[token] = now.Add(HandoverTime)
+	if s, ok := km.sessions[token]; ok && !s.rolled && s.expires.After(now) {
+		// keep the current token alive for a short handover time,
+		// in case there are concurrent requests using the old token.
+		km.sessions[token] = session{expires: time.Now().Add(HandoverTime * time.Second), rolled: true}
 		// issue a new token.
 		return km.newSession()
 	} else {
@@ -147,8 +153,8 @@ func (km *keyMgr) LogOut(token string) {
 func (km *keyMgr) newSession() (token string, ends int, err error) {
 	// clean out expired tokens.
 	now := time.Now()
-	for key, ts := range km.sessions {
-		if ts.After(now) {
+	for key, s := range km.sessions {
+		if s.expires.Before(now) {
 			// seems safe: https://go.dev/doc/effective_go#for
 			delete(km.sessions, key)
 		}
@@ -160,7 +166,7 @@ func (km *keyMgr) newSession() (token string, ends int, err error) {
 		return "", 0, ErrOutOfEntropy
 	}
 	token = hex.EncodeToString(tok[:])
-	km.sessions[token] = time.Now().Add(SessionTime * time.Second)
+	km.sessions[token] = session{expires: time.Now().Add((SessionTime + HandoverTime) * time.Second)}
 	return token, SessionTime, nil
 }
 
