@@ -14,7 +14,6 @@ import (
 
 	"code.dogecoin.org/dkm/internal"
 	"code.dogecoin.org/dkm/internal/keymgr"
-	"code.dogecoin.org/gossip/dnet"
 	"code.dogecoin.org/governor"
 	"github.com/dogeorg/doge/bip39"
 )
@@ -27,7 +26,7 @@ type WebAPI struct {
 	srv    http.Server
 }
 
-func New(bind dnet.Address, store internal.Store, keymgr internal.KeyMgr) governor.Service {
+func New(bind internal.Address, store internal.Store, keymgr internal.KeyMgr) governor.Service {
 	mux := http.NewServeMux()
 	a := &WebAPI{
 		store:  store,

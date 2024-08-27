@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"code.dogecoin.org/dkm/internal"
-	"code.dogecoin.org/gossip/dnet"
 	"github.com/dogeorg/doge"
 	"github.com/dogeorg/doge/bip39"
 	"golang.org/x/crypto/argon2"
@@ -188,8 +187,7 @@ func (km *keyMgr) decryptKey(keyID int, pass string) (seed []byte, pub []byte, e
 		return nil, nil, err
 	}
 	memZero(pwdKey)
-	var nodeKey dnet.KeyPair
-	decrypted := make([]byte, 0, len(nodeKey.Priv))
+	decrypted := make([]byte, 0, PrivateKeySize)
 	decrypted, err = aead.Open(decrypted, nonce, enc, nil)
 	memZero(nonce)
 	memZero(enc)
