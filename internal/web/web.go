@@ -144,7 +144,7 @@ func (a *WebAPI) login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		token, ends, err := a.keymgr.Auth(pass)
+		token, ends, err := a.keymgr.LogIn(pass)
 		if err != nil {
 			sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
 		}
@@ -232,7 +232,7 @@ type ChangePassRequest struct {
 	NewPassword string `json:"new_password"`
 }
 type ChangePassResponse struct {
-	Changed bool `json:"valid"`
+	Changed bool `json:"changed"`
 }
 
 func (a *WebAPI) changePassword(w http.ResponseWriter, r *http.Request) {
@@ -251,8 +251,27 @@ func (a *WebAPI) changePassword(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// validate passwords
+		pass := strings.TrimSpace(args.Password)
+		if len(pass) < 1 {
+			sendError(w, http.StatusInternalServerError, "password", "password is empty", options)
+			return
+		}
+		newpass := strings.TrimSpace(args.NewPassword)
+		if len(newpass) < 1 {
+			sendError(w, http.StatusInternalServerError, "newpassword", "new password is empty", options)
+			return
+		}
+
+		// change the password
+		err = a.keymgr.ChangePassword(pass, newpass)
+		if err != nil {
+			sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
+			return
+		}
+
 		// response
-		res := ChangePassResponse{}
+		res := ChangePassResponse{Changed: true}
 		sendJson(w, res, options)
 	} else {
 		sendOptions(w, r, options)
@@ -264,7 +283,7 @@ type RecoveryRequest struct {
 	NewPassword string   `json:"new_password"`
 }
 type RecoveryResponse struct {
-	Changed bool `json:"valid"`
+	Changed bool `json:"changed"`
 }
 
 func (a *WebAPI) recoverPassword(w http.ResponseWriter, r *http.Request) {
@@ -283,8 +302,26 @@ func (a *WebAPI) recoverPassword(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// validate new password
+		newpass := strings.TrimSpace(args.NewPassword)
+		if len(newpass) < 1 {
+			sendError(w, http.StatusInternalServerError, "newpassword", "new password is empty", options)
+			return
+		}
+		if len(args.Seedphrase) < 1 {
+			sendError(w, http.StatusInternalServerError, "seedphrase", "missing seedphrase", options)
+			return
+		}
+
+		// attempt to change the password
+		err = a.keymgr.RecoverPassword(args.Seedphrase, newpass)
+		if err != nil {
+			sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
+			return
+		}
+
 		// response
-		res := RecoveryResponse{}
+		res := RecoveryResponse{Changed: true}
 		sendJson(w, res, options)
 	} else {
 		sendOptions(w, r, options)
@@ -356,6 +393,9 @@ func codeForErr(err error) string {
 	}
 	if errors.Is(err, keymgr.ErrKeyExists) {
 		return "exists"
+	}
+	if errors.Is(err, keymgr.ErrNoKey) {
+		return "nokey"
 	}
 	return "error"
 }

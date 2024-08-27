@@ -5,12 +5,13 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"log"
 	"time"
 
 	"code.dogecoin.org/dkm/internal"
 	"code.dogecoin.org/gossip/dnet"
+	"github.com/dogeorg/doge"
 	"github.com/dogeorg/doge/bip39"
-	"github.com/dogeorg/doge/wrapped"
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/chacha20poly1305"
 )
@@ -19,6 +20,20 @@ var _ internal.KeyMgr = &keyMgr{}
 
 const SessionTime = 10 * 60 // seconds
 const HandoverTime = 10     // seconds
+const MainKey = 1           // ID of main key
+const ArgonTime = 1
+const ArgonMemory = 64 * 1024
+const ArgonThreads = 4
+const PrivateKeySize = 64
+const MnemonicEntropyBits = 256
+
+var ErrOutOfEntropy = errors.New("insufficient entropy available")
+var ErrWrongPassword = errors.New("incorrect password")
+var ErrBadToken = errors.New("invalid or expired token")
+var ErrKeyExists = errors.New("key already exists")
+var ErrTooManyAttempts = errors.New("too many attempts to generate a key")
+var ErrWrongMnemonic = errors.New("mnemonic does not match existing key")
+var ErrNoKey = errors.New("key has not been created")
 
 type keyMgr struct {
 	store    internal.StoreCtx
@@ -37,96 +52,32 @@ func New(store internal.StoreCtx) internal.KeyMgr {
 	}
 }
 
-var ErrOutOfEntropy, wrapOutOfEntropy = wrapped.New("not enough entropy available in the OS entropy pool")
-var ErrWrongPassword = errors.New("incorrect password")
-var ErrBadToken = errors.New("invalid or expired token")
-var ErrKeyExists = errors.New("key already exists")
-
 func (km *keyMgr) CreateKey(pass string) (mnemonic []string, err error) {
-	// generate salts
-	salt := [16]byte{}
-	_, err = rand.Read(salt[:])
-	if err != nil {
-		return nil, wrapOutOfEntropy(err)
-	}
-	nonce := [chacha20poly1305.NonceSizeX]byte{}
-	_, err = rand.Read(nonce[:])
-	if err != nil {
-		return nil, wrapOutOfEntropy(err)
-	}
-
-	// generate mnemonic phrase
-	mnemonic, seed, err := bip39.GenerateRandomMnemonic(256, pass, bip39.EnglishWordList)
+	mnemonic, seed, pub, err := km.generateMnemonic()
 	if err != nil {
 		return nil, err
 	}
-
-	// ensure mnemonic phrase can be used later
-	seed2, err := bip39.SeedFromMnemonic(mnemonic, pass, bip39.EnglishWordList)
-	if err != nil {
-		return nil, err
-	}
-	if !bytes.Equal(seed, seed2) {
-		memZero(seed)
-		memZero(seed2)
-		return nil, err
-		//sendError(w, http.StatusServiceUnavailable, "error", "bug: generated mnemonic did not round-trip", options)
-	}
-	memZero(seed2)
-
-	// verify the generated seed produces a valid key
-	nodeKey := dnet.KeyPairFromSeed(seed[0:32])
+	err = km.encryptKey(MainKey, seed, pub, pass, false)
 	memZero(seed)
-
-	// encrypt the private key with the password key
-	pwdKey := argon2.IDKey([]byte(pass), salt[:], 1, 64*1024, 4, chacha20poly1305.KeySize)
-	aead, err := chacha20poly1305.NewX(pwdKey[:])
-	memZero(pwdKey)
-	if err != nil {
-		return nil, err
-	}
-	encrypted := make([]byte, 0, len(nodeKey.Priv))
-	encrypted = aead.Seal(encrypted, nonce[:], nodeKey.Priv, nil)
-	memZero(nodeKey.Priv)
-	memZero(nodeKey.Pub)
-
-	// store the password nonce, master-key nonce, encrypted master-key
-	err = km.store.SetMaster(1, salt[:], nonce[:], encrypted, false)
-	memZero(encrypted)
-	memZero(nonce[:])
-	memZero(salt[:])
 	if err != nil {
 		if internal.IsAlreadyExistsError(err) {
 			return nil, ErrKeyExists
 		}
 		return nil, err
 	}
-
 	return mnemonic, nil
 }
 
-func (km *keyMgr) Auth(pass string) (token string, ends int, err error) {
-	salt, nonce, enc, err := km.store.GetMaster(1)
+func (km *keyMgr) LogIn(pass string) (token string, ends int, err error) {
+	// verify the password
+	key, _, err := km.decryptKey(MainKey, pass)
+	memZero(key)
 	if err != nil {
-		return
+		if errors.Is(err, internal.ErrNotFound) {
+			return "", 0, ErrNoKey
+		}
+		return // wrong password
 	}
-	pwdKey := argon2.IDKey([]byte(pass), salt, 1, 64*1024, 4, chacha20poly1305.KeySize)
-	memZero(salt)
-	aead, err := chacha20poly1305.NewX(pwdKey[:])
-	if err != nil {
-		return
-	}
-	memZero(pwdKey)
-	var nodeKey dnet.KeyPair
-	decrypted := make([]byte, 0, len(nodeKey.Priv))
-	decrypted, err = aead.Open(decrypted, nonce, enc, nil)
-	memZero(nonce)
-	memZero(enc)
-	if err != nil {
-		// only errOpen "message authentication failed"
-		return "", 0, ErrWrongPassword
-	}
-	memZero(decrypted)
 	token, ends, err = km.newSession()
 	if err != nil {
 		return
@@ -154,6 +105,56 @@ func (km *keyMgr) LogOut(token string) {
 	delete(km.sessions, token)
 }
 
+func (km *keyMgr) ChangePassword(password string, newpass string) error {
+	// decrypt the key using the current password
+	key, pub, err := km.decryptKey(MainKey, password)
+	if err != nil {
+		memZero(key)
+		if errors.Is(err, internal.ErrNotFound) {
+			return ErrNoKey
+		}
+		return err
+	}
+	err = km.encryptKey(MainKey, key, pub, newpass, true)
+	memZero(key)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (km *keyMgr) RecoverPassword(mnemonic []string, newpass string) error {
+	// get the existing stored pubkey
+	pub, err := km.store.GetKeyPub(MainKey)
+	if err != nil {
+		if errors.Is(err, internal.ErrNotFound) {
+			return ErrNoKey
+		}
+		return err
+	}
+
+	// re-generate the key from the supplied mnemonic
+	seed, err := bip39.SeedFromMnemonic(mnemonic, "", bip39.EnglishWordList)
+	if err != nil {
+		return err // bad mnemonic
+	}
+	if !doge.ECKeyIsValid(seed[0:32]) {
+		return ErrWrongMnemonic // we check validity when we generate the mnemonic
+	}
+	newpub := doge.ECPubKeyFromECPrivKey(seed[0:32])
+	if !bytes.Equal(pub, newpub) {
+		return ErrWrongMnemonic // mnemonic pubkey differs from the stored pubkey
+	}
+
+	// re-encrypt the stored key using the new password
+	err = km.encryptKey(MainKey, seed, pub, newpass, true)
+	memZero(seed)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (km *keyMgr) newSession() (token string, ends int, err error) {
 	// clean out expired tokens.
 	now := time.Now()
@@ -172,6 +173,102 @@ func (km *keyMgr) newSession() (token string, ends int, err error) {
 	token = hex.EncodeToString(tok[:])
 	km.sessions[token] = session{expires: time.Now().Add((SessionTime + HandoverTime) * time.Second)}
 	return token, SessionTime, nil
+}
+
+func (km *keyMgr) decryptKey(keyID int, pass string) (seed []byte, pub []byte, err error) {
+	salt, nonce, enc, pub, err := km.store.GetKey(keyID)
+	if err != nil {
+		return nil, nil, err
+	}
+	// decrypt the private key using the password (via Argon2)
+	pwdKey := argon2.IDKey([]byte(pass), salt, ArgonTime, ArgonMemory, ArgonThreads, chacha20poly1305.KeySize)
+	memZero(salt)
+	aead, err := chacha20poly1305.NewX(pwdKey[:])
+	if err != nil {
+		return nil, nil, err
+	}
+	memZero(pwdKey)
+	var nodeKey dnet.KeyPair
+	decrypted := make([]byte, 0, len(nodeKey.Priv))
+	decrypted, err = aead.Open(decrypted, nonce, enc, nil)
+	memZero(nonce)
+	memZero(enc)
+	if err != nil {
+		// only errOpen "message authentication failed"
+		return nil, nil, ErrWrongPassword
+	}
+	return decrypted, pub, nil
+}
+
+func (km *keyMgr) encryptKey(keyID int, seed []byte, pub []byte, pass string, allowReplace bool) error {
+	// generate salts
+	salt := [16]byte{}
+	_, err := rand.Read(salt[:])
+	if err != nil {
+		return ErrOutOfEntropy
+	}
+	nonce := [chacha20poly1305.NonceSizeX]byte{}
+	_, err = rand.Read(nonce[:])
+	if err != nil {
+		return ErrOutOfEntropy
+	}
+	return km.encryptKeyWithSalts(keyID, salt[:], nonce[:], seed, pub, pass, allowReplace)
+}
+
+func (km *keyMgr) encryptKeyWithSalts(keyID int, salt []byte, nonce []byte, seed []byte, pub []byte, pass string, allowReplace bool) error {
+	// encrypt the private key with the password (via Argon2)
+	pwdKey := argon2.IDKey([]byte(pass), salt, ArgonTime, ArgonMemory, ArgonThreads, chacha20poly1305.KeySize)
+	aead, err := chacha20poly1305.NewX(pwdKey)
+	memZero(pwdKey) // minimum exposure time
+	if err != nil {
+		return err
+	}
+	encrypted := make([]byte, 0, len(seed))
+	encrypted = aead.Seal(encrypted, nonce, seed, nil)
+
+	// store the password nonce, key nonce, encrypted key
+	err = km.store.SetKey(keyID, salt, nonce, encrypted, pub, allowReplace)
+	// after storing, clearing buffers is critical
+	memZero(encrypted)
+	memZero(nonce)
+	memZero(salt)
+	return err
+}
+
+func (km *keyMgr) generateMnemonic() (mnemonic []string, seed []byte, pub []byte, err error) {
+	attempt := 0
+	for attempt < 1000 {
+		// cannot use the password as BIP39 passphrase here,
+		// otherwise we cannot support password recovery.
+		mnemonic, seed, err = bip39.GenerateRandomMnemonic(MnemonicEntropyBits, "", bip39.EnglishWordList)
+		if err != nil {
+			return // only ErrOutOfEntropy
+		}
+
+		// ensure mnemonic phrase can be used later
+		seed2, err := bip39.SeedFromMnemonic(mnemonic, "", bip39.EnglishWordList)
+		if err != nil {
+			log.Printf("BUG: could not decode generated mnemonic: %v", mnemonic)
+			attempt += 1
+			continue
+		}
+		if !bytes.Equal(seed, seed2) {
+			log.Printf("BUG: mnemonic did not round-trip: %v", mnemonic)
+			attempt += 1
+			continue
+		}
+		memZero(seed2)
+
+		// verify the generated seed represents a valid private key
+		if !doge.ECKeyIsValid(seed[0:32]) {
+			log.Printf("BUG: mnemonic generates an invalid private key: %v", mnemonic)
+			attempt += 1
+			continue
+		}
+		pub = doge.ECPubKeyFromECPrivKey(seed[0:32])
+		return mnemonic, seed, pub, nil
+	}
+	return nil, nil, nil, ErrTooManyAttempts
 }
 
 func memZero(to []byte) {

@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS config (
 	id INTEGER PRIMARY KEY,
 	s1 BLOB NOT NULL,
 	s2 BLOB NOT NULL,
-	enc BLOB NOT NULL
+	enc BLOB NOT NULL,
+	pub BLOB NOT NULL
 );
 `
 
@@ -64,6 +65,15 @@ func (s *SQLiteStore) WithCtx(ctx context.Context) internal.StoreCtx {
 func IsConflict(err error) bool {
 	if sqErr, isSq := err.(sqlite3.Error); isSq {
 		if sqErr.Code == sqlite3.ErrBusy || sqErr.Code == sqlite3.ErrLocked {
+			return true
+		}
+	}
+	return false
+}
+
+func IsConstraint(err error) bool {
+	if sqErr, isSq := err.(sqlite3.Error); isSq {
+		if sqErr.Code == sqlite3.ErrConstraint {
 			return true
 		}
 	}
@@ -120,46 +130,65 @@ func (s SQLiteStoreCtx) Sleep(dur time.Duration) {
 }
 
 func dbErr(err error, where string) error {
+	if errors.Is(err, sql.ErrNoRows) {
+		return internal.ErrNotFound
+	}
 	if sqErr, isSq := err.(sqlite3.Error); isSq {
 		if sqErr.Code == sqlite3.ErrConstraint {
 			// MUST detect 'AlreadyExists' to fulfil the API contract!
 			// Constraint violation, e.g. a duplicate key.
-			return internal.WrapErr(internal.AlreadyExists, "SQLiteStore: already-exists", err)
+			return internal.ErrAlreadyExists
 		}
 		if sqErr.Code == sqlite3.ErrBusy || sqErr.Code == sqlite3.ErrLocked {
 			// SQLite has a single-writer policy, even in WAL (write-ahead) mode.
 			// SQLite will return BUSY if the database is locked by another connection.
 			// We treat this as a transient database conflict, and the caller should retry.
-			return internal.WrapErr(internal.DBConflict, "SQLiteStore: db-conflict", err)
+			return internal.ErrDBConflict
 		}
 	}
-	return internal.WrapErr(internal.DBProblem, fmt.Sprintf("SQLiteStore: db-problem: %s", where), err)
+	return fmt.Errorf("store: %v: %w", where, err)
 }
 
 // STORE INTERFACE
 
-func (s SQLiteStoreCtx) SetMaster(id int, s1 []byte, s2 []byte, enc []byte, allowReplace bool) error {
-	return s.doTxn("SetMaster", func(tx *sql.Tx) error {
-		_, err := tx.Exec("INSERT INTO config (id,s1,s2,enc) VALUES (?,?,?,?)", id, s1, s2, enc)
+func (s SQLiteStoreCtx) SetKey(id int, s1 []byte, s2 []byte, enc []byte, pub []byte, allowReplace bool) error {
+	return s.doTxn("SetKey", func(tx *sql.Tx) error {
+		_, err := tx.Exec("INSERT INTO config (id,s1,s2,enc,pub) VALUES (?,?,?,?,?)", id, s1, s2, enc, pub)
 		if err != nil {
-			if errors.Is(err, sqlite3.ErrConstraint) && allowReplace {
+			if IsConstraint(err) && allowReplace {
 				// already exists and allowed to replace.
-				_, err = tx.Exec("UPDATE config SET s1=?,s2=?,enc=? WHERE id=?", s1, s2, enc, id)
+				_, err = tx.Exec("UPDATE config SET s1=?,s2=?,enc=?,pub=? WHERE id=?", s1, s2, enc, pub, id)
 				if err != nil {
-					return dbErr(err, "SetMaster")
+					return dbErr(err, "SetKey")
 				}
 				return nil
 			}
-			return dbErr(err, "SetMaster") // AlreadyExists or error
+			return dbErr(err, "SetKey") // AlreadyExists or error
 		}
 		return nil
 	})
 }
 
-func (s SQLiteStoreCtx) GetMaster(id int) (s1 []byte, s2 []byte, enc []byte, err error) {
-	err = s.doTxn("GetMaster", func(tx *sql.Tx) error {
-		row := tx.QueryRow("SELECT s1,s2,enc FROM config LIMIT 1")
-		return row.Scan(&s1, &s2, &enc)
+func (s SQLiteStoreCtx) GetKey(id int) (s1 []byte, s2 []byte, enc []byte, pub []byte, err error) {
+	err = s.doTxn("GetKey", func(tx *sql.Tx) error {
+		row := tx.QueryRow("SELECT s1,s2,enc,pub FROM config WHERE id=?", id)
+		err = row.Scan(&s1, &s2, &enc, &pub)
+		if err != nil {
+			return dbErr(err, "GetKey")
+		}
+		return nil
+	})
+	return
+}
+
+func (s SQLiteStoreCtx) GetKeyPub(id int) (pub []byte, err error) {
+	err = s.doTxn("GetKeyPub", func(tx *sql.Tx) error {
+		row := tx.QueryRow("SELECT pub FROM config WHERE id=?", id)
+		err = row.Scan(&pub)
+		if err != nil {
+			return dbErr(err, "GetKeyPub")
+		}
+		return nil
 	})
 	return
 }
