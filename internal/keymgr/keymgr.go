@@ -40,6 +40,7 @@ func New(store internal.StoreCtx) internal.KeyMgr {
 var ErrOutOfEntropy, wrapOutOfEntropy = wrapped.New("not enough entropy available in the OS entropy pool")
 var ErrWrongPassword = errors.New("incorrect password")
 var ErrBadToken = errors.New("invalid or expired token")
+var ErrKeyExists = errors.New("key already exists")
 
 func (km *keyMgr) CreateKey(pass string) (mnemonic []string, err error) {
 	// generate salts
@@ -90,11 +91,14 @@ func (km *keyMgr) CreateKey(pass string) (mnemonic []string, err error) {
 	memZero(nodeKey.Pub)
 
 	// store the password nonce, master-key nonce, encrypted master-key
-	err = km.store.SetMaster(salt[:], nonce[:], encrypted)
+	err = km.store.SetMaster(1, salt[:], nonce[:], encrypted, false)
 	memZero(encrypted)
 	memZero(nonce[:])
 	memZero(salt[:])
 	if err != nil {
+		if internal.IsAlreadyExistsError(err) {
+			return nil, ErrKeyExists
+		}
 		return nil, err
 	}
 
@@ -102,7 +106,7 @@ func (km *keyMgr) CreateKey(pass string) (mnemonic []string, err error) {
 }
 
 func (km *keyMgr) Auth(pass string) (token string, ends int, err error) {
-	salt, nonce, enc, err := km.store.GetMaster()
+	salt, nonce, enc, err := km.store.GetMaster(1)
 	if err != nil {
 		return
 	}
