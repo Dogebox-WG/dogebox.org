@@ -218,9 +218,9 @@ func (km *keyMgr) encryptKey(keyID int, seed []byte, pub []byte, pass string, al
 	if err != nil {
 		return err
 	}
-	encrypted := make([]byte, 0, len(seed))
+	// seed is always PrivateKeySize, encrypted is typically 80 bytes
+	encrypted := make([]byte, 0, 2*PrivateKeySize) // to avoid realloc
 	encrypted = aead.Seal(encrypted, nonce, seed, nil)
-	log.Printf("len %v vs %v", len(seed), len(encrypted))
 
 	// store the password nonce, key nonce, encrypted key
 	err = km.store.SetKey(keyID, salt, nonce, encrypted, pub, allowReplace)

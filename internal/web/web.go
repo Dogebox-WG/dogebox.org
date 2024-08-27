@@ -390,6 +390,9 @@ func codeForErr(err error) string {
 	if errors.Is(err, keymgr.ErrWrongPassword) {
 		return "password"
 	}
+	if errors.Is(err, keymgr.ErrWrongMnemonic) {
+		return "mnemonic"
+	}
 	if errors.Is(err, keymgr.ErrKeyExists) {
 		return "exists"
 	}
