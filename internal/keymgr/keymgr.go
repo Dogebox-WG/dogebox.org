@@ -200,20 +200,17 @@ func (km *keyMgr) decryptKey(keyID int, pass string) (seed []byte, pub []byte, e
 
 func (km *keyMgr) encryptKey(keyID int, seed []byte, pub []byte, pass string, allowReplace bool) error {
 	// generate salts
-	salt := [16]byte{}
-	_, err := rand.Read(salt[:])
+	salt := make([]byte, 16)
+	_, err := rand.Read(salt)
 	if err != nil {
 		return ErrOutOfEntropy
 	}
-	nonce := [chacha20poly1305.NonceSizeX]byte{}
-	_, err = rand.Read(nonce[:])
+	nonce := make([]byte, chacha20poly1305.NonceSizeX)
+	_, err = rand.Read(nonce)
 	if err != nil {
 		return ErrOutOfEntropy
 	}
-	return km.encryptKeyWithSalts(keyID, salt[:], nonce[:], seed, pub, pass, allowReplace)
-}
 
-func (km *keyMgr) encryptKeyWithSalts(keyID int, salt []byte, nonce []byte, seed []byte, pub []byte, pass string, allowReplace bool) error {
 	// encrypt the private key with the password (via Argon2)
 	pwdKey := argon2.IDKey([]byte(pass), salt, ArgonTime, ArgonMemory, ArgonThreads, chacha20poly1305.KeySize)
 	aead, err := chacha20poly1305.NewX(pwdKey)
@@ -223,6 +220,7 @@ func (km *keyMgr) encryptKeyWithSalts(keyID int, salt []byte, nonce []byte, seed
 	}
 	encrypted := make([]byte, 0, len(seed))
 	encrypted = aead.Seal(encrypted, nonce, seed, nil)
+	log.Printf("len %v vs %v", len(seed), len(encrypted))
 
 	// store the password nonce, key nonce, encrypted key
 	err = km.store.SetKey(keyID, salt, nonce, encrypted, pub, allowReplace)
