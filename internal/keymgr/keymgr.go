@@ -33,6 +33,7 @@ var ErrKeyExists = errors.New("key already exists")
 var ErrTooManyAttempts = errors.New("too many attempts to generate a key")
 var ErrWrongMnemonic = errors.New("mnemonic does not match existing key")
 var ErrNoKey = errors.New("key has not been created")
+var ErrWrongToken = errors.New("invalid token")
 
 type keyMgr struct {
 	store    internal.StoreCtx
@@ -56,8 +57,7 @@ func (km *keyMgr) CreateKey(pass string) (mnemonic []string, err error) {
 	if err != nil {
 		return nil, err
 	}
-	err = km.encryptKey(MainKey, seed, pub, pass, false)
-	memZero(seed)
+	err = km.encryptAndSetKey(MainKey, seed, pub, pass, false)
 	if err != nil {
 		if internal.IsAlreadyExistsError(err) {
 			return nil, ErrKeyExists
@@ -69,7 +69,7 @@ func (km *keyMgr) CreateKey(pass string) (mnemonic []string, err error) {
 
 func (km *keyMgr) LogIn(pass string) (token string, ends int, err error) {
 	// verify the password
-	key, _, err := km.decryptKey(MainKey, pass)
+	key, _, err := km.getAndDecryptKey(MainKey, pass)
 	memZero(key)
 	if err != nil {
 		if errors.Is(err, internal.ErrNotFound) {
@@ -106,7 +106,7 @@ func (km *keyMgr) LogOut(token string) {
 
 func (km *keyMgr) ChangePassword(password string, newpass string) error {
 	// decrypt the key using the current password
-	key, pub, err := km.decryptKey(MainKey, password)
+	key, pub, err := km.getAndDecryptKey(MainKey, password)
 	if err != nil {
 		memZero(key)
 		if errors.Is(err, internal.ErrNotFound) {
@@ -114,12 +114,7 @@ func (km *keyMgr) ChangePassword(password string, newpass string) error {
 		}
 		return err
 	}
-	err = km.encryptKey(MainKey, key, pub, newpass, true)
-	memZero(key)
-	if err != nil {
-		return err
-	}
-	return nil
+	return km.encryptAndSetKey(MainKey, key, pub, newpass, true)
 }
 
 func (km *keyMgr) RecoverPassword(mnemonic []string, newpass string) error {
@@ -146,13 +141,38 @@ func (km *keyMgr) RecoverPassword(mnemonic []string, newpass string) error {
 	}
 
 	// re-encrypt the stored key using the new password
-	err = km.encryptKey(MainKey, seed, pub, newpass, true)
-	memZero(seed)
-	if err != nil {
-		return err
-	}
-	return nil
+	return km.encryptAndSetKey(MainKey, seed, pub, newpass, true)
 }
+
+func (km *keyMgr) GetPubKey(id string) (pubkey []byte, err error) {
+	return km.store.GetDelegatePub(id)
+}
+
+func (km *keyMgr) GetPrivKey(id string, token string) (privkey, pubkey []byte, err error) {
+	salt, nonce, enc, pub, err := km.store.GetDelegatePriv(id)
+	if err != nil {
+		return nil, nil, err
+	}
+	priv, err := km.decryptKey(salt, nonce, enc, token)
+	memZero(enc)
+	memZero(salt)
+	memZero(nonce)
+	if err != nil {
+		memZero(priv)
+		if errors.Is(err, ErrWrongPassword) { // from decryptKey
+			err = ErrWrongToken
+		}
+		return nil, nil, err
+	}
+	return priv, pub, nil
+}
+
+func (km *keyMgr) DelegateKey(id string) (token string, pubkey []byte, err error) {
+	// XXX yet to do
+	return "", nil, ErrNoKey
+}
+
+// HELPERS
 
 func (km *keyMgr) newSession() (token string, ends int, err error) {
 	// clean out expired tokens.
@@ -174,41 +194,67 @@ func (km *keyMgr) newSession() (token string, ends int, err error) {
 	return token, SessionTime, nil
 }
 
-func (km *keyMgr) decryptKey(keyID int, pass string) (seed []byte, pub []byte, err error) {
-	salt, nonce, enc, pub, err := km.store.GetKey(keyID)
+func (km *keyMgr) getAndDecryptKey(keyId int, pass string) (key []byte, pub []byte, err error) {
+	salt, nonce, enc, pubk, err := km.store.GetKey(keyId)
 	if err != nil {
 		return nil, nil, err
 	}
+	dec, err := km.decryptKey(salt, nonce, enc, pass)
+	memZero(enc)
+	memZero(salt)
+	memZero(nonce)
+	return dec, pubk, err
+}
+
+func (km *keyMgr) decryptKey(salt []byte, nonce []byte, enc []byte, pass string) (key []byte, err error) {
 	// decrypt the private key using the password (via Argon2)
 	pwdKey := argon2.IDKey([]byte(pass), salt, ArgonTime, ArgonMemory, ArgonThreads, chacha20poly1305.KeySize)
 	memZero(salt)
 	aead, err := chacha20poly1305.NewX(pwdKey[:])
-	if err != nil {
-		return nil, nil, err
-	}
 	memZero(pwdKey)
-	decrypted := make([]byte, 0, PrivateKeySize)
-	decrypted, err = aead.Open(decrypted, nonce, enc, nil)
+	if err != nil {
+		memZero(nonce)
+		memZero(enc)
+		return nil, err
+	}
+	key = make([]byte, 0, PrivateKeySize)
+	key, err = aead.Open(key, nonce, enc, nil)
 	memZero(nonce)
 	memZero(enc)
 	if err != nil {
 		// only errOpen "message authentication failed"
-		return nil, nil, ErrWrongPassword
+		return nil, ErrWrongPassword
 	}
-	return decrypted, pub, nil
+	return key, nil
 }
 
-func (km *keyMgr) encryptKey(keyID int, seed []byte, pub []byte, pass string, allowReplace bool) error {
-	// generate salts
-	salt := make([]byte, 16)
-	_, err := rand.Read(salt)
+// encrypt secret with password and store. clears secret.
+func (km *keyMgr) encryptAndSetKey(keyId int, secret, pub []byte, pass string, allowReplace bool) (err error) {
+	salt, nonce, enc, err := km.encryptKey(secret, pass)
+	memZero(secret)
 	if err != nil {
-		return ErrOutOfEntropy
+		return err
 	}
-	nonce := make([]byte, chacha20poly1305.NonceSizeX)
+	// store the password nonce, key nonce, encrypted key
+	err = km.store.SetKey(keyId, salt, nonce, enc, pub, allowReplace)
+	memZero(enc)
+	memZero(nonce)
+	memZero(salt)
+	return err
+}
+
+// encrypt secret with password.
+func (km *keyMgr) encryptKey(secret []byte, pass string) (salt, nonce, enc []byte, err error) {
+	// generate salts
+	salt = make([]byte, 16)
+	_, err = rand.Read(salt)
+	if err != nil {
+		return nil, nil, nil, ErrOutOfEntropy
+	}
+	nonce = make([]byte, chacha20poly1305.NonceSizeX)
 	_, err = rand.Read(nonce)
 	if err != nil {
-		return ErrOutOfEntropy
+		return nil, nil, nil, ErrOutOfEntropy
 	}
 
 	// encrypt the private key with the password (via Argon2)
@@ -216,19 +262,13 @@ func (km *keyMgr) encryptKey(keyID int, seed []byte, pub []byte, pass string, al
 	aead, err := chacha20poly1305.NewX(pwdKey)
 	memZero(pwdKey) // minimum exposure time
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 	// seed is always PrivateKeySize, encrypted is typically 80 bytes
-	encrypted := make([]byte, 0, 2*PrivateKeySize) // to avoid realloc
-	encrypted = aead.Seal(encrypted, nonce, seed, nil)
+	enc = make([]byte, 0, 2*PrivateKeySize) // to avoid realloc
+	enc = aead.Seal(enc, nonce, secret, nil)
 
-	// store the password nonce, key nonce, encrypted key
-	err = km.store.SetKey(keyID, salt, nonce, encrypted, pub, allowReplace)
-	// after storing, clearing buffers is critical
-	memZero(encrypted)
-	memZero(nonce)
-	memZero(salt)
-	return err
+	return salt, nonce, enc, err
 }
 
 func (km *keyMgr) generateMnemonic() (mnemonic []string, seed []byte, pub []byte, err error) {

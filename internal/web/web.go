@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -42,6 +43,8 @@ func New(bind internal.Address, store internal.Store, keymgr internal.KeyMgr) go
 	mux.HandleFunc("/logout", a.logout)
 	mux.HandleFunc("/change-password", a.changePassword)
 	mux.HandleFunc("/recover-password", a.recoverPassword)
+	mux.HandleFunc("/delegated-key", a.delegatedKey)
+	mux.HandleFunc("/public-key", a.publicKey)
 
 	return a
 }
@@ -325,6 +328,101 @@ func (a *WebAPI) recoverPassword(w http.ResponseWriter, r *http.Request) {
 	} else {
 		sendOptions(w, r, options)
 	}
+}
+
+type DelegateKeyRequest struct {
+	ID    string `json:"id"`
+	Token string `json:"token"`
+}
+type DelegateKeyResponse struct {
+	Priv string `json:"priv"`
+	Pub  string `json:"pub"`
+}
+
+func (a *WebAPI) delegatedKey(w http.ResponseWriter, r *http.Request) {
+	options := "POST, OPTIONS"
+	if r.Method == http.MethodPost {
+		// request
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			sendError(w, http.StatusBadRequest, "bad-request", fmt.Sprintf("bad request: %v", err), options)
+			return
+		}
+		var args DelegateKeyRequest
+		err = json.Unmarshal(body, &args)
+		if err != nil {
+			sendError(w, http.StatusInternalServerError, "json", fmt.Sprintf("decoding JSON: %v", err), options)
+			return
+		}
+		if args.ID == "" {
+			sendError(w, http.StatusInternalServerError, "bad-request", "missing 'id'", options)
+			return
+		}
+		if args.Token == "" {
+			sendError(w, http.StatusInternalServerError, "bad-request", "missing 'token'", options)
+			return
+		}
+
+		priv, pub, err := a.keymgr.GetPrivKey(args.ID, args.Token)
+		if err != nil {
+			sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
+		}
+
+		// response
+		res := DelegateKeyResponse{Priv: hex.EncodeToString(priv), Pub: hex.EncodeToString(pub)}
+		sendJson(w, res, options)
+	} else {
+		sendOptions(w, r, options)
+	}
+}
+
+type PublicKeyRequest struct {
+	ID string `json:"id"`
+}
+type PublicKeyResponse struct {
+	Key string `json:"key"`
+}
+
+func (a *WebAPI) getPubKeyHex(id string) string {
+	return ""
+}
+func (a *WebAPI) publicKey(w http.ResponseWriter, r *http.Request) {
+	// request
+	options := "GET, POST, OPTIONS"
+	id := ""
+	if r.Method == http.MethodGet {
+		id = r.URL.Query().Get("id")
+	} else if r.Method == http.MethodPost {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			sendError(w, http.StatusBadRequest, "bad-request", fmt.Sprintf("bad request: %v", err), options)
+			return
+		}
+		var args PublicKeyRequest
+		err = json.Unmarshal(body, &args)
+		if err != nil {
+			sendError(w, http.StatusInternalServerError, "json", fmt.Sprintf("decoding JSON: %v", err), options)
+			return
+		}
+		id = args.ID
+	} else {
+		sendOptions(w, r, options)
+		return
+	}
+
+	if id == "" {
+		sendError(w, http.StatusInternalServerError, "bad-request", "missing 'id' query parameter", options)
+		return
+	}
+
+	key, err := a.keymgr.GetPubKey(id)
+	if err != nil {
+		sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
+	}
+
+	// response
+	res := PublicKeyResponse{Key: hex.EncodeToString(key)}
+	sendJson(w, res, options)
 }
 
 // HELPERS

@@ -12,9 +12,12 @@ type Store interface {
 
 // StoreCtx is a Store bound to a cancellable Context
 type StoreCtx interface {
-	SetKey(id int, s1 []byte, s2 []byte, enc []byte, pub []byte, allowReplace bool) error
-	GetKey(id int) (s1 []byte, s2 []byte, enc []byte, pub []byte, err error)
+	SetKey(id int, s1, s2, enc, pub []byte, allowReplace bool) error
+	GetKey(id int) (s1, s2, enc, pub []byte, err error)
 	GetKeyPub(id int) (pub []byte, err error)
+	SetDelegate(id string, s1, s2, enc, pub []byte) (err error)
+	GetDelegatePriv(id string) (s1, s2, enc, pub []byte, err error)
+	GetDelegatePub(id string) (pub []byte, err error)
 }
 
 var ErrNotFound = errors.New("store: not found")

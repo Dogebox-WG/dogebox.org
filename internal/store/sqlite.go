@@ -19,6 +19,13 @@ CREATE TABLE IF NOT EXISTS config (
 	enc BLOB NOT NULL,
 	pub BLOB NOT NULL
 );
+CREATE TABLE IF NOT EXISTS delegate (
+	id TEXT PRIMARY KEY,
+	s1 BLOB NOT NULL,
+	s2 BLOB NOT NULL,
+	enc BLOB NOT NULL,
+	pub BLOB NOT NULL
+);
 `
 
 type SQLiteStore struct {
@@ -187,6 +194,46 @@ func (s SQLiteStoreCtx) GetKeyPub(id int) (pub []byte, err error) {
 		err = row.Scan(&pub)
 		if err != nil {
 			return dbErr(err, "GetKeyPub")
+		}
+		return nil
+	})
+	return
+}
+
+func (s SQLiteStoreCtx) SetDelegate(id string, s1, s2, enc, pub []byte) (err error) {
+	return s.doTxn("SetDelegate", func(tx *sql.Tx) error {
+		_, err := tx.Exec("INSERT INTO delegate (id,s1,s2,enc,pub) VALUES (?,?,?,?,?)", id, s1, s2, enc, pub)
+		if err != nil {
+			return dbErr(err, "SetDelegate") // AlreadyExists or error
+		}
+		return nil
+	})
+}
+
+func (s SQLiteStoreCtx) GetDelegatePub(id string) (pub []byte, err error) {
+	err = s.doTxn("GetDelegatePub", func(tx *sql.Tx) error {
+		row := tx.QueryRow("SELECT pub FROM delegate WHERE id=?", id)
+		err = row.Scan(&pub)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return internal.ErrNotFound
+			}
+			return dbErr(err, "GetDelegatePub")
+		}
+		return nil
+	})
+	return
+}
+
+func (s SQLiteStoreCtx) GetDelegatePriv(id string) (s1, s2, enc, pub []byte, err error) {
+	err = s.doTxn("GetDelegatePriv", func(tx *sql.Tx) error {
+		row := tx.QueryRow("SELECT s1,s2,enc,pub FROM delegate WHERE id=?", id)
+		err = row.Scan(&s1, &s2, &enc, &pub)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return internal.ErrNotFound
+			}
+			return dbErr(err, "GetDelegatePriv")
 		}
 		return nil
 	})
