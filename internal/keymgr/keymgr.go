@@ -20,7 +20,6 @@ var _ internal.KeyMgr = &keyMgr{}
 const SessionTime = 10 * 60 // seconds
 const HandoverTime = 10     // seconds
 const MainKey = 1           // ID of main key
-const PrivateKeySize = 64
 const MnemonicEntropyBits = 256
 
 // Argon2 parameters.
@@ -30,6 +29,7 @@ const MnemonicEntropyBits = 256
 const ArgonTime = 3
 const ArgonThreads = 4
 const ArgonMemory = 64 * 1024 // 64 MB
+const SecretKeySize = doge.SerializedBip32KeyLength
 
 var ErrOutOfEntropy = errors.New("insufficient entropy available")
 var ErrWrongPassword = errors.New("incorrect password")
@@ -309,7 +309,7 @@ func (km *keyMgr) decryptKey(salt []byte, nonce []byte, enc []byte, pass string)
 		memZero(enc)
 		return nil, err
 	}
-	key = make([]byte, 0, PrivateKeySize)
+	key = make([]byte, 0, SecretKeySize)
 	key, err = aead.Open(key, nonce, enc, nil)
 	memZero(nonce)
 	memZero(enc)
@@ -355,8 +355,7 @@ func (km *keyMgr) encryptKey(secret []byte, pass string) (salt, nonce, enc []byt
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	// seed is always PrivateKeySize, encrypted is typically 80 bytes
-	enc = make([]byte, 0, 2*PrivateKeySize) // to avoid realloc
+	enc = make([]byte, 0, SecretKeySize*2) // to avoid realloc (includes Poly1305 tag)
 	enc = aead.Seal(enc, nonce, secret, nil)
 
 	return salt, nonce, enc, err
