@@ -208,7 +208,7 @@ func (km *keyMgr) CreateDelegate(id string, pass string) (tok string, pubkey []b
 			return err
 		}
 		pub := child.GetECPubKey()
-		err = km.store.SetDelegate(id, salt, nonce, enc, pub, keyIndex) // AlreadyExists|error
+		err = tx.SetDelegate(id, salt, nonce, enc, pub, keyIndex) // DBConflict|AlreadyExists|error
 		if err != nil {
 			return err
 		}
