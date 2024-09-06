@@ -20,11 +20,16 @@ var _ internal.KeyMgr = &keyMgr{}
 const SessionTime = 10 * 60 // seconds
 const HandoverTime = 10     // seconds
 const MainKey = 1           // ID of main key
-const ArgonTime = 1
-const ArgonMemory = 64 * 1024
-const ArgonThreads = 4
 const PrivateKeySize = 64
 const MnemonicEntropyBits = 256
+
+// Argon2 parameters.
+// RFC 9106: "If much less memory is available, a uniformly safe option is Argon2id
+// with t=3 iterations, p=4 lanes, m=2^(16) (64 MiB of RAM), 128-bit salt, and 256-bit
+// tag size. This is the SECOND RECOMMENDED option."
+const ArgonTime = 3
+const ArgonThreads = 4
+const ArgonMemory = 64 * 1024 // 64 MB
 
 var ErrOutOfEntropy = errors.New("insufficient entropy available")
 var ErrWrongPassword = errors.New("incorrect password")
@@ -294,7 +299,7 @@ func (km *keyMgr) getAndDecryptKey(keyId int, pass string) (key []byte, pub []by
 }
 
 func (km *keyMgr) decryptKey(salt []byte, nonce []byte, enc []byte, pass string) (key []byte, err error) {
-	// decrypt the private key using the password (via Argon2)
+	// decrypt the private key using the password (via Argon2id)
 	pwdKey := argon2.IDKey([]byte(pass), salt, ArgonTime, ArgonMemory, ArgonThreads, chacha20poly1305.KeySize)
 	memZero(salt)
 	aead, err := chacha20poly1305.NewX(pwdKey[:]) // bad-key-len
@@ -343,7 +348,7 @@ func (km *keyMgr) encryptKey(secret []byte, pass string) (salt, nonce, enc []byt
 		return nil, nil, nil, ErrOutOfEntropy
 	}
 
-	// encrypt the private key with the password (via Argon2)
+	// encrypt the private key with the password (via Argon2id)
 	pwdKey := argon2.IDKey([]byte(pass), salt, ArgonTime, ArgonMemory, ArgonThreads, chacha20poly1305.KeySize)
 	aead, err := chacha20poly1305.NewX(pwdKey) // bad-key-len
 	memZero(pwdKey)                            // minimum exposure time
