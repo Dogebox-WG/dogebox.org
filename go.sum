@@ -2,8 +2,8 @@ github.com/btcsuite/golangcrypto v0.0.0-20150304025918-53f62d9b43e8 h1:nOsAWScwu
 github.com/btcsuite/golangcrypto v0.0.0-20150304025918-53f62d9b43e8/go.mod h1:tYvUd8KLhm/oXvUeSEs2VlLghFjQt9+ZaF9ghH0JNjc=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 h1:rpfIENRNNilwHwZeG5+P150SMrnNEcHYvcCuK6dPZSg=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0/go.mod h1:v57UDF4pDQJcEfFUCRop3lJL149eHGSe9Jvczhzjo/0=
-github.com/dogeorg/doge v0.0.4 h1:/Tkwqrx1KSvuhNcF6RCFe9rKQXrddrLgiH0T+2ux7Z4=
-github.com/dogeorg/doge v0.0.4/go.mod h1:juA8vDx8pX7m8QjcIbR7s/6XurkguHfEDR6/XOJwSyA=
+github.com/dogeorg/doge v0.0.8 h1:Zv7T4buaWXQGiBOVPmq+/fB1wGHF8zhs6A+7Dy/Z3qo=
+github.com/dogeorg/doge v0.0.8/go.mod h1:juA8vDx8pX7m8QjcIbR7s/6XurkguHfEDR6/XOJwSyA=
 github.com/dogeorg/governor v1.0.2 h1:bDjB89rBmrtyerRF8Mh3fP2RYs/p4esdFKkApQgWab8=
 github.com/dogeorg/governor v1.0.2/go.mod h1:sYCXRKKmwZvvzEFjjP2RRkUMbFMwVmXp3vEQf1vkzj4=
 github.com/mattn/go-sqlite3 v1.14.22 h1:2gZY6PC6kBnID23Tichd1K+Z0oS6nE/XwU+Vz/5o4kU=

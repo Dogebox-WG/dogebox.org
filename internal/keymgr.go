@@ -7,7 +7,7 @@ type KeyMgr interface {
 	LogOut(token string)
 	ChangePassword(password string, newpass string) error
 	RecoverPassword(mnemonic []string, newpass string) error
-	GetPubKey(id string) (pubkey []byte, err error)
-	GetPrivKey(id string, token string) (privkey []byte, pubkey []byte, err error)
-	DelegateKey(id string) (token string, pubkey []byte, err error)
+	CreateDelegate(id string, pass string) (token string, pub []byte, err error)
+	GetDelegatePub(id string) (pubkey []byte, err error)
+	GetDelegatePriv(id string, token string) (privkey []byte, pubkey []byte, err error)
 }

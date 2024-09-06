@@ -3,7 +3,7 @@ module code.dogecoin.org/dkm
 require code.dogecoin.org/governor v1.0.2
 
 require (
-	github.com/dogeorg/doge v0.0.4
+	github.com/dogeorg/doge v0.0.8
 	github.com/mattn/go-sqlite3 v1.14.22
 	golang.org/x/crypto v0.26.0
 )

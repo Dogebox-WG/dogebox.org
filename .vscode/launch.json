@@ -11,6 +11,7 @@
             "mode": "auto",
             "program": "${workspaceFolder}",
             "preLaunchTask": "create storage",
+            "args": ["--dir=storage"]
         }
     ]
 }

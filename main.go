@@ -3,7 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"net"
+	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -15,14 +18,27 @@ import (
 )
 
 const WebAPIDefaultPort = 8089
-const DBFilePath = "storage/dkm.db"
+const DBFileName = "dkm.db"
 
 func main() {
 	var bind internal.Address
+	dir := "."
+	stderr := log.New(os.Stderr, "", 0)
+	flag.Func("dir", "<path> - storage directory (default '.')", func(arg string) error {
+		ent, err := os.Stat(arg)
+		if err != nil {
+			stderr.Fatalf("--dir: %v", err)
+		}
+		if !ent.IsDir() {
+			stderr.Fatalf("--dir: not a directory: %v", arg)
+		}
+		dir = arg
+		return nil
+	})
 	flag.Func("bind", "<ip>:<port> (use [<ip>]:<port> for IPv6)", func(arg string) error {
 		addr, err := parseIPPort(arg, "bind", WebAPIDefaultPort)
 		if err != nil {
-			return err
+			stderr.Fatalf("%v", err)
 		}
 		bind = addr
 		return nil
@@ -33,7 +49,7 @@ func main() {
 	}
 
 	gov := governor.New().CatchSignals().Restart(1 * time.Second)
-	db, err := store.New(DBFilePath)
+	db, err := store.New(path.Join(dir, DBFileName))
 	if err != nil {
 		panic(err)
 	}

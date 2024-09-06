@@ -24,8 +24,10 @@ CREATE TABLE IF NOT EXISTS delegate (
 	s1 BLOB NOT NULL,
 	s2 BLOB NOT NULL,
 	enc BLOB NOT NULL,
-	pub BLOB NOT NULL
+	pub BLOB NOT NULL,
+	keyid INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS delegate_keyid_i ON delegate (keyid);
 `
 
 type SQLiteStore struct {
@@ -34,7 +36,17 @@ type SQLiteStore struct {
 
 type SQLiteStoreCtx struct {
 	_db *sql.DB
+	db  Queryable
 	ctx context.Context
+	tx  *sql.Tx // set if inside a transaction, otherwise nil
+}
+
+// The common read-only parts of sql.DB and sql.Tx interfaces, so we can pass either
+// one to some helper functions (for methods that appear on both SQLiteStore and
+// SQLiteStoreTransaction)
+type Queryable interface {
+	Query(query string, args ...any) (*sql.Rows, error)
+	QueryRow(query string, args ...any) *sql.Row
 }
 
 func New(filename string) (internal.Store, error) {
@@ -65,11 +77,18 @@ func (s *SQLiteStore) Close() {
 func (s *SQLiteStore) WithCtx(ctx context.Context) internal.StoreCtx {
 	return &SQLiteStoreCtx{
 		_db: s.db,
+		db:  s.db,
 		ctx: ctx,
 	}
 }
 
 func IsConflict(err error) bool {
+	// this allows the work() function in doTxn() to return ErrDBConflict
+	// to cause the transaction to retry.
+	if errors.Is(err, internal.ErrDBConflict) {
+		return true
+	}
+	// these errors come from db.Begin(), db.Commit() or potentially any query.
 	if sqErr, isSq := err.(sqlite3.Error); isSq {
 		if sqErr.Code == sqlite3.ErrBusy || sqErr.Code == sqlite3.ErrLocked {
 			return true
@@ -89,6 +108,11 @@ func IsConstraint(err error) bool {
 
 func (s SQLiteStoreCtx) doTxn(name string, work func(tx *sql.Tx) error) error {
 	db := s._db
+	if s.tx != nil {
+		// already running inside a user-level store.Transaction,
+		// so just run the work function directly.
+		return work(s.tx)
+	}
 	limit := 120
 	for {
 		tx, err := db.Begin()
@@ -103,6 +127,8 @@ func (s SQLiteStoreCtx) doTxn(name string, work func(tx *sql.Tx) error) error {
 			return fmt.Errorf("[Store] cannot begin transaction: %w", err)
 		}
 		defer tx.Rollback()
+		// work() may return ErrDBConflict to retry the transaction.
+		// any sqlite conflict error will also retry the transaction.
 		err = work(tx)
 		if err != nil {
 			if IsConflict(err) {
@@ -158,6 +184,18 @@ func dbErr(err error, where string) error {
 
 // STORE INTERFACE
 
+func (s SQLiteStoreCtx) Transaction(work func(tx internal.StoreTxn) error) error {
+	return s.doTxn("txn", func(tx *sql.Tx) error {
+		stx := &SQLiteStoreCtx{
+			_db: s._db,
+			db:  tx,
+			ctx: s.ctx,
+			tx:  tx,
+		}
+		return work(stx)
+	})
+}
+
 func (s SQLiteStoreCtx) SetKey(id int, s1 []byte, s2 []byte, enc []byte, pub []byte, allowReplace bool) error {
 	return s.doTxn("SetKey", func(tx *sql.Tx) error {
 		_, err := tx.Exec("INSERT INTO config (id,s1,s2,enc,pub) VALUES (?,?,?,?,?)", id, s1, s2, enc, pub)
@@ -200,9 +238,9 @@ func (s SQLiteStoreCtx) GetKeyPub(id int) (pub []byte, err error) {
 	return
 }
 
-func (s SQLiteStoreCtx) SetDelegate(id string, s1, s2, enc, pub []byte) (err error) {
+func (s SQLiteStoreCtx) SetDelegate(id string, s1, s2, enc, pub []byte, keyid uint32) (err error) {
 	return s.doTxn("SetDelegate", func(tx *sql.Tx) error {
-		_, err := tx.Exec("INSERT INTO delegate (id,s1,s2,enc,pub) VALUES (?,?,?,?,?)", id, s1, s2, enc, pub)
+		_, err := tx.Exec("INSERT INTO delegate (id,s1,s2,enc,pub,keyid) VALUES (?,?,?,?,?,?)", id, s1, s2, enc, pub, keyid)
 		if err != nil {
 			return dbErr(err, "SetDelegate") // AlreadyExists or error
 		}
@@ -215,9 +253,6 @@ func (s SQLiteStoreCtx) GetDelegatePub(id string) (pub []byte, err error) {
 		row := tx.QueryRow("SELECT pub FROM delegate WHERE id=?", id)
 		err = row.Scan(&pub)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return internal.ErrNotFound
-			}
 			return dbErr(err, "GetDelegatePub")
 		}
 		return nil
@@ -230,10 +265,19 @@ func (s SQLiteStoreCtx) GetDelegatePriv(id string) (s1, s2, enc, pub []byte, err
 		row := tx.QueryRow("SELECT s1,s2,enc,pub FROM delegate WHERE id=?", id)
 		err = row.Scan(&s1, &s2, &enc, &pub)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return internal.ErrNotFound
-			}
 			return dbErr(err, "GetDelegatePriv")
+		}
+		return nil
+	})
+	return
+}
+
+func (s SQLiteStoreCtx) GetMaxDelegate() (max uint32, err error) {
+	err = s.doTxn("GetMaxDelegate", func(tx *sql.Tx) error {
+		row := tx.QueryRow("SELECT COALESCE(MAX(keyid),0) FROM delegate")
+		err = row.Scan(&max)
+		if err != nil {
+			return dbErr(err, "GetMaxDelegate")
 		}
 		return nil
 	})

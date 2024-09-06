@@ -16,6 +16,7 @@ import (
 	"code.dogecoin.org/dkm/internal"
 	"code.dogecoin.org/dkm/internal/keymgr"
 	"code.dogecoin.org/governor"
+	"github.com/dogeorg/doge"
 	"github.com/dogeorg/doge/bip39"
 )
 
@@ -43,8 +44,9 @@ func New(bind internal.Address, store internal.Store, keymgr internal.KeyMgr) go
 	mux.HandleFunc("/logout", a.logout)
 	mux.HandleFunc("/change-password", a.changePassword)
 	mux.HandleFunc("/recover-password", a.recoverPassword)
-	mux.HandleFunc("/delegated-key", a.delegatedKey)
-	mux.HandleFunc("/public-key", a.publicKey)
+	mux.HandleFunc("/create-delegate", a.createDelegate)
+	mux.HandleFunc("/get-delegate-key", a.getDelegatePriv)
+	mux.HandleFunc("/get-delegate-pub", a.getDelegatePub)
 
 	return a
 }
@@ -78,6 +80,9 @@ type CreateResponse struct {
 	Seedphrase []string `json:"seedphrase"`
 }
 
+// API: /create {"password":"xyz"}
+// => {"seedphrase":["remain","nothing","vendor", (24 words) ]}
+// => {"error":"password","reason":"password is empty"}
 func (a *WebAPI) create(w http.ResponseWriter, r *http.Request) {
 	options := "POST, OPTIONS"
 	if r.Method == http.MethodPost {
@@ -90,7 +95,7 @@ func (a *WebAPI) create(w http.ResponseWriter, r *http.Request) {
 		var args CreateRequest
 		err = json.Unmarshal(body, &args)
 		if err != nil {
-			sendError(w, http.StatusInternalServerError, "json", fmt.Sprintf("decoding JSON: %v", err), options)
+			sendError(w, http.StatusInternalServerError, "bad-request", fmt.Sprintf("decoding JSON: %v", err), options)
 			return
 		}
 
@@ -123,6 +128,9 @@ type LoginResponse struct {
 	ValidFor int    `json:"valid_for"`
 }
 
+// API: /login {"password":"xyz"}
+// => {"token":"652b2b63ca6273119b0deb1da807879e","valid_for":600}
+// => {"error":"password","reason":"incorrect password"}
 func (a *WebAPI) login(w http.ResponseWriter, r *http.Request) {
 	options := "POST, OPTIONS"
 	if r.Method == http.MethodPost {
@@ -135,7 +143,7 @@ func (a *WebAPI) login(w http.ResponseWriter, r *http.Request) {
 		var args LoginRequest
 		err = json.Unmarshal(body, &args)
 		if err != nil {
-			sendError(w, http.StatusInternalServerError, "json", fmt.Sprintf("decoding JSON: %v", err), options)
+			sendError(w, http.StatusInternalServerError, "bad-request", fmt.Sprintf("decoding JSON: %v", err), options)
 			return
 		}
 
@@ -167,6 +175,9 @@ type RollTokenResponse struct {
 	ValidFor int    `json:"valid_for"`
 }
 
+// API: /roll-token {"token":"652b2b63ca6273119b0deb1da807879e"}
+// => {"token":"52eef94ed16ea8dd1412c982d91e7de4","valid_for":600}
+// => {"error":"token","reason":"invalid or expired token"}
 func (a *WebAPI) rollToken(w http.ResponseWriter, r *http.Request) {
 	options := "POST, OPTIONS"
 	if r.Method == http.MethodPost {
@@ -179,7 +190,7 @@ func (a *WebAPI) rollToken(w http.ResponseWriter, r *http.Request) {
 		var args RollTokenRequest
 		err = json.Unmarshal(body, &args)
 		if err != nil {
-			sendError(w, http.StatusInternalServerError, "json", fmt.Sprintf("decoding JSON: %v", err), options)
+			sendError(w, http.StatusInternalServerError, "bad-request", fmt.Sprintf("decoding JSON: %v", err), options)
 			return
 		}
 
@@ -203,6 +214,8 @@ type LogOutRequest struct {
 type LogOutResponse struct {
 }
 
+// API: /logout {"token":"39d5c614a1c1bf4e7d117d0287d6dc41"}
+// => {}
 func (a *WebAPI) logout(w http.ResponseWriter, r *http.Request) {
 	options := "POST, OPTIONS"
 	if r.Method == http.MethodPost {
@@ -215,7 +228,7 @@ func (a *WebAPI) logout(w http.ResponseWriter, r *http.Request) {
 		var args LogOutRequest
 		err = json.Unmarshal(body, &args)
 		if err != nil {
-			sendError(w, http.StatusInternalServerError, "json", fmt.Sprintf("decoding JSON: %v", err), options)
+			sendError(w, http.StatusInternalServerError, "bad-request", fmt.Sprintf("decoding JSON: %v", err), options)
 			return
 		}
 
@@ -237,6 +250,12 @@ type ChangePassResponse struct {
 	Changed bool `json:"changed"`
 }
 
+// API: /change-password {"password":"xya","newpassword":"xyz"}
+// => {"changed":true}
+// => {"error":"password","reason":"incorrect password"}
+// => {"error":"password","reason":"password is empty"}
+// => {"error":"newpassword","reason":"new password is empty"}
+// => {"error":"nokey","reason":"key has not been created"}
 func (a *WebAPI) changePassword(w http.ResponseWriter, r *http.Request) {
 	options := "POST, OPTIONS"
 	if r.Method == http.MethodPost {
@@ -249,7 +268,7 @@ func (a *WebAPI) changePassword(w http.ResponseWriter, r *http.Request) {
 		var args ChangePassRequest
 		err = json.Unmarshal(body, &args)
 		if err != nil {
-			sendError(w, http.StatusInternalServerError, "json", fmt.Sprintf("decoding JSON: %v", err), options)
+			sendError(w, http.StatusInternalServerError, "bad-request", fmt.Sprintf("decoding JSON: %v", err), options)
 			return
 		}
 
@@ -288,6 +307,14 @@ type RecoveryResponse struct {
 	Changed bool `json:"changed"`
 }
 
+// API: /recover-password {"seedphrase":["scare","fury", (24 words) ],"new_password":"xyz"}
+// => {"changed":true}
+// => {"error":"length","reason":"wrong mnemonic length: must be 12, 15, 18, 21 or 24 words"}
+// => {"error":"wordlist","reason":"wrong word in mnemonic phrase: not on the wordlist"}
+// => {"error":"checksum","reason":"wrong mnemonic phrase: checksum doesn't match"}
+// => {"error":"seedphrase","reason":"missing seedphrase"}
+// => {"error":"newpassword","reason":"new password is empty"}
+// => {"error":"nokey","reason":"key has not been created"}
 func (a *WebAPI) recoverPassword(w http.ResponseWriter, r *http.Request) {
 	options := "POST, OPTIONS"
 	if r.Method == http.MethodPost {
@@ -300,7 +327,7 @@ func (a *WebAPI) recoverPassword(w http.ResponseWriter, r *http.Request) {
 		var args RecoveryRequest
 		err = json.Unmarshal(body, &args)
 		if err != nil {
-			sendError(w, http.StatusInternalServerError, "json", fmt.Sprintf("decoding JSON: %v", err), options)
+			sendError(w, http.StatusInternalServerError, "bad-request", fmt.Sprintf("decoding JSON: %v", err), options)
 			return
 		}
 
@@ -330,6 +357,64 @@ func (a *WebAPI) recoverPassword(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type CreateDelegateRequest struct {
+	ID   string `json:"id"`
+	Pass string `json:"password"`
+}
+type CreateDelegateResponse struct {
+	Token string `json:"token"`
+	Pub   string `json:"pub"`
+}
+
+// API: /create-delegate { id:"pup.xyz", password:"dogebox-rulez" }
+//
+// Success: { token:"hex", pub:"hex" }
+// Failure: { error:"bad-request|entropy|exists|password|nokey|error", "reason":"str" }
+//
+// Errors:
+//
+//	entropy: insufficient entropy available
+//	exists: delegate key for this id already exists
+//	password: wrong password for master key
+//	nokey: master key hasn't been created yet
+//	error: system nonsense
+func (a *WebAPI) createDelegate(w http.ResponseWriter, r *http.Request) {
+	options := "POST, OPTIONS"
+	if r.Method == http.MethodPost {
+		// request
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			sendError(w, http.StatusBadRequest, "bad-request", fmt.Sprintf("bad request: %v", err), options)
+			return
+		}
+		var args CreateDelegateRequest
+		err = json.Unmarshal(body, &args)
+		if err != nil {
+			sendError(w, http.StatusInternalServerError, "bad-request", fmt.Sprintf("decoding JSON: %v", err), options)
+			return
+		}
+		if args.ID == "" {
+			sendError(w, http.StatusInternalServerError, "bad-request", "missing 'id'", options)
+			return
+		}
+		if args.Pass == "" {
+			sendError(w, http.StatusInternalServerError, "bad-request", "missing 'password'", options)
+			return
+		}
+
+		token, pub, err := a.keymgr.CreateDelegate(args.ID, args.Pass)
+		if err != nil {
+			sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
+		}
+
+		// response
+		res := CreateDelegateResponse{Token: token, Pub: hex.EncodeToString(pub)}
+		sendJson(w, res, options)
+	} else {
+		sendOptions(w, r, options)
+	}
+}
+
 type DelegateKeyRequest struct {
 	ID    string `json:"id"`
 	Token string `json:"token"`
@@ -339,7 +424,16 @@ type DelegateKeyResponse struct {
 	Pub  string `json:"pub"`
 }
 
-func (a *WebAPI) delegatedKey(w http.ResponseWriter, r *http.Request) {
+// API: /get-delegate-key { id:"pup.xyz", token:"hex" }
+//
+// Success: { priv:"hex", pub:"hex" }
+// Failure: { error:"bad-request|not-found|wrong-token|error", "reason":"str" }
+//
+// Errors:
+//
+//	not-found: no delegate key found for id
+//	wrong-token: wrong token for this key id
+func (a *WebAPI) getDelegatePriv(w http.ResponseWriter, r *http.Request) {
 	options := "POST, OPTIONS"
 	if r.Method == http.MethodPost {
 		// request
@@ -351,7 +445,7 @@ func (a *WebAPI) delegatedKey(w http.ResponseWriter, r *http.Request) {
 		var args DelegateKeyRequest
 		err = json.Unmarshal(body, &args)
 		if err != nil {
-			sendError(w, http.StatusInternalServerError, "json", fmt.Sprintf("decoding JSON: %v", err), options)
+			sendError(w, http.StatusInternalServerError, "bad-request", fmt.Sprintf("decoding JSON: %v", err), options)
 			return
 		}
 		if args.ID == "" {
@@ -363,7 +457,7 @@ func (a *WebAPI) delegatedKey(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		priv, pub, err := a.keymgr.GetPrivKey(args.ID, args.Token)
+		priv, pub, err := a.keymgr.GetDelegatePriv(args.ID, args.Token)
 		if err != nil {
 			sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
 		}
@@ -376,17 +470,22 @@ func (a *WebAPI) delegatedKey(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type PublicKeyRequest struct {
+type DelegatePubRequest struct {
 	ID string `json:"id"`
 }
-type PublicKeyResponse struct {
-	Key string `json:"key"`
+type DelegatePubResponse struct {
+	Pub string `json:"pub"`
 }
 
-func (a *WebAPI) getPubKeyHex(id string) string {
-	return ""
-}
-func (a *WebAPI) publicKey(w http.ResponseWriter, r *http.Request) {
+// API: /get-delegate-pub { id:"pup.xyz" }
+//
+// Success: { pub:"hex" }
+// Failure: { error:"bad-request|not-found|error", "reason":"str" }
+//
+// Errors:
+//
+//	not-found: no delegate key found for id
+func (a *WebAPI) getDelegatePub(w http.ResponseWriter, r *http.Request) {
 	// request
 	options := "GET, POST, OPTIONS"
 	id := ""
@@ -398,10 +497,10 @@ func (a *WebAPI) publicKey(w http.ResponseWriter, r *http.Request) {
 			sendError(w, http.StatusBadRequest, "bad-request", fmt.Sprintf("bad request: %v", err), options)
 			return
 		}
-		var args PublicKeyRequest
+		var args DelegatePubRequest
 		err = json.Unmarshal(body, &args)
 		if err != nil {
-			sendError(w, http.StatusInternalServerError, "json", fmt.Sprintf("decoding JSON: %v", err), options)
+			sendError(w, http.StatusInternalServerError, "bad-request", fmt.Sprintf("decoding JSON: %v", err), options)
 			return
 		}
 		id = args.ID
@@ -415,13 +514,13 @@ func (a *WebAPI) publicKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, err := a.keymgr.GetPubKey(id)
+	key, err := a.keymgr.GetDelegatePub(id)
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
 	}
 
 	// response
-	res := PublicKeyResponse{Key: hex.EncodeToString(key)}
+	res := DelegatePubResponse{Pub: hex.EncodeToString(key)}
 	sendJson(w, res, options)
 }
 
@@ -430,7 +529,7 @@ func (a *WebAPI) publicKey(w http.ResponseWriter, r *http.Request) {
 func sendJson(w http.ResponseWriter, res any, options string) {
 	bytes, err := json.Marshal(res)
 	if err != nil {
-		sendError(w, http.StatusInternalServerError, "json", fmt.Sprintf("encoding JSON: %v", err), options)
+		sendError(w, http.StatusInternalServerError, "error", fmt.Sprintf("encoding JSON: %v", err), options)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -488,14 +587,26 @@ func codeForErr(err error) string {
 	if errors.Is(err, keymgr.ErrWrongPassword) {
 		return "password"
 	}
+	if errors.Is(err, keymgr.ErrWrongToken) {
+		return "wrong-token"
+	}
 	if errors.Is(err, keymgr.ErrWrongMnemonic) {
 		return "mnemonic"
 	}
-	if errors.Is(err, keymgr.ErrKeyExists) {
+	if errors.Is(err, keymgr.ErrKeyExists) || errors.Is(err, internal.ErrAlreadyExists) {
 		return "exists"
+	}
+	if errors.Is(err, internal.ErrNotFound) {
+		return "not-found"
 	}
 	if errors.Is(err, keymgr.ErrNoKey) {
 		return "nokey"
+	}
+	if errors.Is(err, keymgr.ErrTooManyAttempts) {
+		return "too-many"
+	}
+	if errors.Is(err, doge.ErrTooDeep) {
+		return "too-deep"
 	}
 	return "error"
 }

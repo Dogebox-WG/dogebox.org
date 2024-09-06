@@ -34,6 +34,7 @@ var ErrTooManyAttempts = errors.New("too many attempts to generate a key")
 var ErrWrongMnemonic = errors.New("mnemonic does not match existing key")
 var ErrNoKey = errors.New("key has not been created")
 var ErrWrongToken = errors.New("invalid token")
+var ErrBadKey = errors.New("bad stored key: cannot decode key")
 
 type keyMgr struct {
 	store    internal.StoreCtx
@@ -53,11 +54,12 @@ func New(store internal.StoreCtx) internal.KeyMgr {
 }
 
 func (km *keyMgr) CreateKey(pass string) (mnemonic []string, err error) {
-	mnemonic, seed, pub, err := km.generateMnemonic()
+	mnemonic, key, pub, err := km.generateMnemonic()
 	if err != nil {
 		return nil, err
 	}
-	err = km.encryptAndSetKey(MainKey, seed, pub, pass, false)
+	err = km.encryptAndSetKey(MainKey, key, pub, pass, false)
+	memZero(key)
 	if err != nil {
 		if internal.IsAlreadyExistsError(err) {
 			return nil, ErrKeyExists
@@ -114,12 +116,14 @@ func (km *keyMgr) ChangePassword(password string, newpass string) error {
 		}
 		return err
 	}
-	return km.encryptAndSetKey(MainKey, key, pub, newpass, true)
+	err = km.encryptAndSetKey(MainKey, key, pub, newpass, true)
+	memZero(key)
+	return err
 }
 
 func (km *keyMgr) RecoverPassword(mnemonic []string, newpass string) error {
 	// get the existing stored pubkey
-	pub, err := km.store.GetKeyPub(MainKey)
+	pub, err := km.store.GetKeyPub(MainKey) // ErrNotFound|error
 	if err != nil {
 		if errors.Is(err, internal.ErrNotFound) {
 			return ErrNoKey
@@ -132,34 +136,108 @@ func (km *keyMgr) RecoverPassword(mnemonic []string, newpass string) error {
 	if err != nil {
 		return err // bad mnemonic
 	}
-	if !doge.ECKeyIsValid(seed[0:32]) {
+	defer memZero(seed) // clear seed material
+
+	// generate Bip32 master key from seed
+	master, err := doge.Bip32MasterFromSeed(seed, &doge.DogeMainNetChain) // ErrBadSeed,ErrAnotherSeed
+	if err != nil {
 		return ErrWrongMnemonic // we check validity when we generate the mnemonic
 	}
-	newpub := doge.ECPubKeyFromECPrivKey(seed[0:32])
+	defer master.Clear() // clear key material
+
+	newpub := master.GetECPubKey()
 	if !bytes.Equal(pub, newpub) {
 		return ErrWrongMnemonic // mnemonic pubkey differs from the stored pubkey
 	}
 
 	// re-encrypt the stored key using the new password
-	return km.encryptAndSetKey(MainKey, seed, pub, newpass, true)
+	key := []byte(master.EncodeWIF())
+	defer memZero(key)
+	err = km.encryptAndSetKey(MainKey, key, pub, newpass, true)
+	return err
 }
 
-func (km *keyMgr) GetPubKey(id string) (pubkey []byte, err error) {
-	return km.store.GetDelegatePub(id)
+func (km *keyMgr) CreateDelegate(id string, pass string) (tok string, pubkey []byte, e error) {
+	key, _, err := km.getAndDecryptKey(MainKey, pass) // ErrNoKey
+	if err != nil {
+		return "", nil, err
+	}
+	master, err := doge.DecodeBip32WIF(string(key), &doge.DogeMainNetChain) // bad-key
+	memZero(key)                                                            // clear key material
+	if err != nil {
+		log.Printf("CreateDelegate: error decoding master key: %v", err)
+		return "", nil, ErrBadKey
+	}
+	// pup namespace: m/1000'/2'/N'
+	const H = doge.HardenedKey
+	pupKey, err := master.PrivateCKD([]uint32{H + 1000, H + 2})
+	master.Clear() // clear key material
+	if err != nil {
+		return "", nil, ErrBadKey
+	}
+	defer pupKey.Clear() // clear key material at exit
+	err = km.store.Transaction(func(tx internal.StoreTxn) error {
+		max, err := tx.GetMaxDelegate()
+		if err != nil {
+			return err
+		}
+		keyIndex := uint32(max + 1)
+		var child *doge.Bip32Key
+		for {
+			child, err = pupKey.PrivateCKD([]uint32{H + keyIndex}) // ErrNextIndex
+			if err == nil {
+				break
+			}
+			if errors.Is(err, doge.ErrNextIndex) {
+				// This key index generates an invalid private key.
+				// We must move on to the next key index (as per Bip32)
+				keyIndex += 1
+				continue // try the next key
+			}
+			return err
+		}
+		defer child.Clear()           // clear key material at exit
+		token, err := generateToken() // ErrOutOfEntropy
+		if err != nil {
+			return err
+		}
+		child_wif := []byte(child.EncodeWIF())
+		defer memZero(child_wif)                                 // clear key material at exit
+		salt, nonce, enc, err := km.encryptKey(child_wif, token) // ErrOutOfEntropy
+		if err != nil {
+			return err
+		}
+		pub := child.GetECPubKey()
+		err = km.store.SetDelegate(id, salt, nonce, enc, pub, keyIndex) // AlreadyExists|error
+		if err != nil {
+			return err
+		}
+		tok = token  // set return value
+		pubkey = pub // set return value
+		return nil
+	})
+	if err != nil {
+		return "", nil, err
+	}
+	return
 }
 
-func (km *keyMgr) GetPrivKey(id string, token string) (privkey, pubkey []byte, err error) {
-	salt, nonce, enc, pub, err := km.store.GetDelegatePriv(id)
+func (km *keyMgr) GetDelegatePub(id string) (pubkey []byte, err error) {
+	return km.store.GetDelegatePub(id) // NotFound|error
+}
+
+func (km *keyMgr) GetDelegatePriv(id string, token string) (privkey, pubkey []byte, err error) {
+	salt, nonce, enc, pub, err := km.store.GetDelegatePriv(id) // NotFound|error
 	if err != nil {
 		return nil, nil, err
 	}
-	priv, err := km.decryptKey(salt, nonce, enc, token)
+	priv, err := km.decryptKey(salt, nonce, enc, token) // WrongPassword
 	memZero(enc)
 	memZero(salt)
 	memZero(nonce)
 	if err != nil {
 		memZero(priv)
-		if errors.Is(err, ErrWrongPassword) { // from decryptKey
+		if errors.Is(err, ErrWrongPassword) {
 			err = ErrWrongToken
 		}
 		return nil, nil, err
@@ -167,12 +245,18 @@ func (km *keyMgr) GetPrivKey(id string, token string) (privkey, pubkey []byte, e
 	return priv, pub, nil
 }
 
-func (km *keyMgr) DelegateKey(id string) (token string, pubkey []byte, err error) {
-	// XXX yet to do
-	return "", nil, ErrNoKey
-}
-
 // HELPERS
+
+func generateToken() (string, error) {
+	tokenBytes := [32]byte{}
+	_, err := rand.Read(tokenBytes[:])
+	if err != nil {
+		return "", ErrOutOfEntropy
+	}
+	token := hex.EncodeToString(tokenBytes[:])
+	memZero(tokenBytes[:])
+	return token, nil
+}
 
 func (km *keyMgr) newSession() (token string, ends int, err error) {
 	// clean out expired tokens.
@@ -195,11 +279,14 @@ func (km *keyMgr) newSession() (token string, ends int, err error) {
 }
 
 func (km *keyMgr) getAndDecryptKey(keyId int, pass string) (key []byte, pub []byte, err error) {
-	salt, nonce, enc, pubk, err := km.store.GetKey(keyId)
+	salt, nonce, enc, pubk, err := km.store.GetKey(keyId) // ErrNotFound|error
 	if err != nil {
+		if errors.Is(err, internal.ErrNotFound) {
+			return nil, nil, ErrNoKey
+		}
 		return nil, nil, err
 	}
-	dec, err := km.decryptKey(salt, nonce, enc, pass)
+	dec, err := km.decryptKey(salt, nonce, enc, pass) // ErrWrongPassword|error
 	memZero(enc)
 	memZero(salt)
 	memZero(nonce)
@@ -210,7 +297,7 @@ func (km *keyMgr) decryptKey(salt []byte, nonce []byte, enc []byte, pass string)
 	// decrypt the private key using the password (via Argon2)
 	pwdKey := argon2.IDKey([]byte(pass), salt, ArgonTime, ArgonMemory, ArgonThreads, chacha20poly1305.KeySize)
 	memZero(salt)
-	aead, err := chacha20poly1305.NewX(pwdKey[:])
+	aead, err := chacha20poly1305.NewX(pwdKey[:]) // bad-key-len
 	memZero(pwdKey)
 	if err != nil {
 		memZero(nonce)
@@ -231,7 +318,6 @@ func (km *keyMgr) decryptKey(salt []byte, nonce []byte, enc []byte, pass string)
 // encrypt secret with password and store. clears secret.
 func (km *keyMgr) encryptAndSetKey(keyId int, secret, pub []byte, pass string, allowReplace bool) (err error) {
 	salt, nonce, enc, err := km.encryptKey(secret, pass)
-	memZero(secret)
 	if err != nil {
 		return err
 	}
@@ -259,8 +345,8 @@ func (km *keyMgr) encryptKey(secret []byte, pass string) (salt, nonce, enc []byt
 
 	// encrypt the private key with the password (via Argon2)
 	pwdKey := argon2.IDKey([]byte(pass), salt, ArgonTime, ArgonMemory, ArgonThreads, chacha20poly1305.KeySize)
-	aead, err := chacha20poly1305.NewX(pwdKey)
-	memZero(pwdKey) // minimum exposure time
+	aead, err := chacha20poly1305.NewX(pwdKey) // bad-key-len
+	memZero(pwdKey)                            // minimum exposure time
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -274,41 +360,46 @@ func (km *keyMgr) encryptKey(secret []byte, pass string) (salt, nonce, enc []byt
 func (km *keyMgr) generateMnemonic() (mnemonic []string, seed []byte, pub []byte, err error) {
 	attempt := 0
 	for attempt < 1000 {
-		// cannot use the password as BIP39 passphrase here,
-		// otherwise we cannot support password recovery.
-		mnemonic, seed, err = bip39.GenerateRandomMnemonic(MnemonicEntropyBits, "", bip39.EnglishWordList)
+		mnemonic, err := bip39.GenerateRandomMnemonic(MnemonicEntropyBits, bip39.EnglishWordList)
 		if err != nil {
-			return // only ErrOutOfEntropy
+			return nil, nil, nil, err // only ErrOutOfEntropy
 		}
 
-		// ensure mnemonic phrase can be used later
-		seed2, err := bip39.SeedFromMnemonic(mnemonic, "", bip39.EnglishWordList)
+		// cannot use the password as BIP39 passphrase here,
+		// otherwise we cannot support password recovery.
+		newseed, err := bip39.SeedFromMnemonic(mnemonic, "", bip39.EnglishWordList) // ErrWrongLength,ErrWrongWord,ErrWrongChecksum
 		if err != nil {
 			log.Printf("BUG: could not decode generated mnemonic: %v", mnemonic)
 			attempt += 1
 			continue
 		}
-		if !bytes.Equal(seed, seed2) {
-			log.Printf("BUG: mnemonic did not round-trip: %v", mnemonic)
-			attempt += 1
-			continue
-		}
-		memZero(seed2)
 
-		// verify the generated seed represents a valid private key
-		if !doge.ECKeyIsValid(seed[0:32]) {
-			log.Printf("BUG: mnemonic generates an invalid private key: %v", mnemonic)
-			attempt += 1
-			continue
+		// generate Bip32 master key from seed
+		master, err := doge.Bip32MasterFromSeed(newseed, &doge.DogeMainNetChain) // ErrBadSeed,ErrAnotherSeed
+		memZero(newseed)                                                         // clear seed material
+		if err != nil {
+			if errors.Is(err, doge.ErrAnotherSeed) {
+				attempt += 1
+				continue
+			}
+			return nil, nil, nil, err
 		}
-		pub = doge.ECPubKeyFromECPrivKey(seed[0:32])
-		return mnemonic, seed, pub, nil
+		pub = master.GetECPubKey()
+
+		// encode the master key as a string byte-array.
+		// not ideal, but this is the Bip32 serialization format.
+		priv := []byte(master.EncodeWIF())
+		master.Clear() // clear key material
+		return mnemonic, priv, pub, nil
 	}
 	return nil, nil, nil, ErrTooManyAttempts
 }
 
-func memZero(to []byte) {
-	for i := range to {
-		to[i] = 0
+var arrayOfZeroBytes [128]byte // 128 zero-bytes (1-2 cache lines)
+
+func memZero(slice []byte) {
+	n := copy(slice, arrayOfZeroBytes[:])
+	for n < len(slice) {
+		n += copy(slice[n:], arrayOfZeroBytes[:])
 	}
 }
