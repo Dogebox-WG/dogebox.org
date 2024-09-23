@@ -10,4 +10,5 @@ type KeyMgr interface {
 	CreateDelegate(id string, pass string) (token string, pub []byte, err error)
 	GetDelegatePub(id string) (pubkey []byte, err error)
 	GetDelegatePriv(id string, token string) (privkey []byte, pubkey []byte, err error)
+	MakeDelegate(id string, token string) (privkey []byte, pubkey []byte, wif string, err error)
 }

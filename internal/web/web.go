@@ -47,6 +47,7 @@ func New(bind internal.Address, store internal.Store, keymgr internal.KeyMgr) go
 	mux.HandleFunc("/create-delegate", a.createDelegate)
 	mux.HandleFunc("/get-delegate-key", a.getDelegatePriv)
 	mux.HandleFunc("/get-delegate-pub", a.getDelegatePub)
+	mux.HandleFunc("/make-delegate", a.makeDelegate)
 
 	return a
 }
@@ -409,6 +410,65 @@ func (a *WebAPI) createDelegate(w http.ResponseWriter, r *http.Request) {
 
 		// response
 		res := CreateDelegateResponse{Token: token, Pub: hex.EncodeToString(pub)}
+		sendJson(w, res, options)
+	} else {
+		sendOptions(w, r, options)
+	}
+}
+
+type MakeDelegateRequest struct {
+	ID    string `json:"id"`
+	Token string `json:"token"`
+}
+type MakeDelegateResponse struct {
+	Pub  string `json:"pub"`
+	Priv string `json:"priv"`
+	Wif  string `json:"wif"`
+}
+
+// API: /make-delegate { id:"pup.xyz", token:"xyz" }
+//
+// Success: { pub:"hex", priv:"hex" }
+// Failure: { error:"bad-request|entropy|exists|password|nokey|error", "reason":"str" }
+//
+// Errors:
+//
+//	entropy: insufficient entropy available
+//	exists: delegate key for this id already exists
+//	password: wrong password for master key
+//	nokey: master key hasn't been created yet
+//	error: system nonsense
+func (a *WebAPI) makeDelegate(w http.ResponseWriter, r *http.Request) {
+	options := "POST, OPTIONS"
+	if r.Method == http.MethodPost {
+		// request
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			sendError(w, http.StatusBadRequest, "bad-request", fmt.Sprintf("bad request: %v", err), options)
+			return
+		}
+		var args MakeDelegateRequest
+		err = json.Unmarshal(body, &args)
+		if err != nil {
+			sendError(w, http.StatusInternalServerError, "bad-request", fmt.Sprintf("decoding JSON: %v", err), options)
+			return
+		}
+		if args.ID == "" {
+			sendError(w, http.StatusInternalServerError, "bad-request", "missing 'id'", options)
+			return
+		}
+		if args.Token == "" {
+			sendError(w, http.StatusInternalServerError, "bad-request", "missing 'token'", options)
+			return
+		}
+
+		priv, pub, wif, err := a.keymgr.MakeDelegate(args.ID, args.Token)
+		if err != nil {
+			sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
+		}
+
+		// response
+		res := MakeDelegateResponse{Priv: hex.EncodeToString(priv), Pub: hex.EncodeToString(pub), Wif: wif}
 		sendJson(w, res, options)
 	} else {
 		sendOptions(w, r, options)

@@ -44,6 +44,7 @@ var ErrBadKey = errors.New("bad stored key: cannot decode key")
 type keyMgr struct {
 	store    internal.StoreCtx
 	sessions map[string]session
+	key      []byte
 }
 
 type session struct {
@@ -75,10 +76,11 @@ func (km *keyMgr) CreateKey(pass string) (mnemonic []string, err error) {
 }
 
 func (km *keyMgr) LogIn(pass string) (token string, ends int, err error) {
+	km.cleanSessions()
 	// verify the password
 	key, _, err := km.getAndDecryptKey(MainKey, pass)
-	memZero(key)
 	if err != nil {
+		memZero(key)
 		if errors.Is(err, internal.ErrNotFound) {
 			return "", 0, ErrNoKey
 		}
@@ -86,12 +88,15 @@ func (km *keyMgr) LogIn(pass string) (token string, ends int, err error) {
 	}
 	token, ends, err = km.newSession()
 	if err != nil {
-		return
+		memZero(key)
+		return // out of entropy
 	}
+	km.key = key // keep key in-memory for `MakeDelegate`
 	return token, ends, nil
 }
 
 func (km *keyMgr) RollToken(token string) (newtoken string, ends int, err error) {
+	km.cleanSessions()
 	now := time.Now()
 	if s, ok := km.sessions[token]; ok && !s.rolled && s.expires.After(now) {
 		// keep the current token alive for a short handover time,
@@ -109,6 +114,12 @@ func (km *keyMgr) RollToken(token string) (newtoken string, ends int, err error)
 func (km *keyMgr) LogOut(token string) {
 	// invalidate the token if it exists.
 	delete(km.sessions, token)
+	// remove key from memory after all sessions expire.
+	km.cleanSessions()
+	if len(km.sessions) < 1 {
+		memZero(km.key)
+		km.key = nil
+	}
 }
 
 func (km *keyMgr) ChangePassword(password string, newpass string) error {
@@ -151,7 +162,7 @@ func (km *keyMgr) RecoverPassword(mnemonic []string, newpass string) error {
 	defer master.Clear() // clear key material
 
 	newpub := master.GetECPubKey()
-	if !bytes.Equal(pub, newpub) {
+	if !bytes.Equal(pub, newpub[:]) {
 		return ErrWrongMnemonic // mnemonic pubkey differs from the stored pubkey
 	}
 
@@ -175,7 +186,7 @@ func (km *keyMgr) CreateDelegate(id string, pass string) (tok string, pubkey []b
 	}
 	// pup namespace: m/1000'/2'/N'
 	const H = doge.HardenedKey
-	pupKey, err := master.PrivateCKD([]uint32{H + 1000, H + 2})
+	pupKey, err := master.PrivateCKD([]uint32{H + 1000, H + 2}, true)
 	master.Clear() // clear key material
 	if err != nil {
 		return "", nil, ErrBadKey
@@ -188,17 +199,8 @@ func (km *keyMgr) CreateDelegate(id string, pass string) (tok string, pubkey []b
 		}
 		keyIndex := uint32(max + 1)
 		var child *doge.Bip32Key
-		for {
-			child, err = pupKey.PrivateCKD([]uint32{H + keyIndex}) // ErrNextIndex
-			if err == nil {
-				break
-			}
-			if errors.Is(err, doge.ErrNextIndex) {
-				// This key index generates an invalid private key.
-				// We must move on to the next key index (as per Bip32)
-				keyIndex += 1
-				continue // try the next key
-			}
+		child, err = pupKey.PrivateCKD([]uint32{H + keyIndex}, true)
+		if err != nil {
 			return err
 		}
 		defer child.Clear()           // clear key material at exit
@@ -213,12 +215,12 @@ func (km *keyMgr) CreateDelegate(id string, pass string) (tok string, pubkey []b
 			return err
 		}
 		pub := child.GetECPubKey()
-		err = tx.SetDelegate(id, salt, nonce, enc, pub, keyIndex) // DBConflict|AlreadyExists|error
+		err = tx.SetDelegate(id, salt, nonce, enc, pub[:], keyIndex) // DBConflict|AlreadyExists|error
 		if err != nil {
 			return err
 		}
-		tok = token  // set return value
-		pubkey = pub // set return value
+		tok = token     // set return value
+		pubkey = pub[:] // set return value
 		return nil
 	})
 	if err != nil {
@@ -227,8 +229,68 @@ func (km *keyMgr) CreateDelegate(id string, pass string) (tok string, pubkey []b
 	return
 }
 
+func (km *keyMgr) MakeDelegate(id string, token string) (privkey []byte, pubkey []byte, wif string, e error) {
+	km.cleanSessions()
+	if _, ok := km.sessions[token]; ok && km.key != nil {
+		master, err := doge.DecodeBip32WIF(string(km.key), &doge.DogeMainNetChain) // bad-key
+		if err != nil {
+			log.Printf("CreateDelegate: error decoding master key: %v", err)
+			return nil, nil, "", ErrBadKey
+		}
+		// pup namespace: m/1000'/2'/N'
+		const H = doge.HardenedKey
+		pupKey, err := master.PrivateCKD([]uint32{H + 1000, H + 2}, true)
+		master.Clear() // clear key material
+		if err != nil {
+			return nil, nil, "", ErrBadKey
+		}
+		defer pupKey.Clear() // clear key material at exit
+		err = km.store.Transaction(func(tx internal.StoreTxn) error {
+			_, keyIndex, err := tx.GetDelegatePub(id) // NotFound|error
+			if err != nil {
+				if errors.Is(err, internal.ErrNotFound) {
+					max, err := tx.GetMaxDelegate()
+					if err != nil {
+						return err
+					}
+					keyIndex = uint32(max + 1)
+					err = tx.SetDelegate(id, []byte{}, []byte{}, []byte{}, []byte{}, keyIndex) // DBConflict|error
+					if err != nil {
+						return err
+					}
+				} else {
+					return err
+				}
+			}
+			child, err := pupKey.PrivateCKD([]uint32{H + keyIndex}, true)
+			if err != nil {
+				return err
+			}
+			defer child.Clear() // clear key material at exit
+			pub := child.GetECPubKey()
+			priv, err := child.GetECPrivKey()
+			if err != nil {
+				return err
+			}
+			// return values:
+			privkey = priv[:]
+			pubkey = pub[:]
+			wif = child.EncodeWIF() // set return value
+			return nil
+		})
+		if err != nil {
+			return nil, nil, "", err
+		}
+		return
+	} else {
+		// the token has already expired.
+		return nil, nil, "", ErrBadToken
+	}
+}
+
 func (km *keyMgr) GetDelegatePub(id string) (pubkey []byte, err error) {
-	return km.store.GetDelegatePub(id) // NotFound|error
+	pub, _, err := km.store.GetDelegatePub(id)
+	return pub, err // NotFound|error
 }
 
 func (km *keyMgr) GetDelegatePriv(id string, token string) (privkey, pubkey []byte, err error) {
@@ -263,7 +325,8 @@ func generateToken() (string, error) {
 	return token, nil
 }
 
-func (km *keyMgr) newSession() (token string, ends int, err error) {
+// cleanSessions removes expired sessions from memory.
+func (km *keyMgr) cleanSessions() {
 	// clean out expired tokens.
 	now := time.Now()
 	for key, s := range km.sessions {
@@ -272,6 +335,9 @@ func (km *keyMgr) newSession() (token string, ends int, err error) {
 			delete(km.sessions, key)
 		}
 	}
+}
+
+func (km *keyMgr) newSession() (token string, ends int, err error) {
 	// generate a cryptographically-secure random token.
 	tok := [16]byte{}
 	_, err = rand.Read(tok[:])
@@ -388,7 +454,8 @@ func (km *keyMgr) generateMnemonic() (mnemonic []string, seed []byte, pub []byte
 			}
 			return nil, nil, nil, err
 		}
-		pub = master.GetECPubKey()
+		newpub := master.GetECPubKey()
+		pub := newpub[:]
 
 		// encode the master key as a string byte-array.
 		// not ideal, but this is the Bip32 serialization format.

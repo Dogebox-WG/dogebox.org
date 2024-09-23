@@ -248,10 +248,10 @@ func (s SQLiteStoreCtx) SetDelegate(id string, s1, s2, enc, pub []byte, keyid ui
 	})
 }
 
-func (s SQLiteStoreCtx) GetDelegatePub(id string) (pub []byte, err error) {
+func (s SQLiteStoreCtx) GetDelegatePub(id string) (pub []byte, keyid uint32, err error) {
 	err = s.doTxn("GetDelegatePub", func(tx *sql.Tx) error {
-		row := tx.QueryRow("SELECT pub FROM delegate WHERE id=?", id)
-		err = row.Scan(&pub)
+		row := tx.QueryRow("SELECT pub,keyid FROM delegate WHERE id=?", id)
+		err = row.Scan(&pub, &keyid)
 		if err != nil {
 			return dbErr(err, "GetDelegatePub")
 		}

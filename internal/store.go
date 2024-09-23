@@ -22,7 +22,7 @@ type StoreTxn interface {
 	GetKeyPub(id int) (pub []byte, err error)
 	SetDelegate(id string, s1, s2, enc, pub []byte, keyid uint32) (err error)
 	GetDelegatePriv(id string) (s1, s2, enc, pub []byte, err error)
-	GetDelegatePub(id string) (pub []byte, err error)
+	GetDelegatePub(id string) (pub []byte, keyid uint32, err error)
 	GetMaxDelegate() (uint32, error)
 }
 
