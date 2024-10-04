@@ -17,7 +17,7 @@ import (
 
 var _ internal.KeyMgr = &keyMgr{}
 
-const SessionTime = 10 * 60 // seconds
+const SessionTime = 65 * 60 // seconds (65 minutes)
 const HandoverTime = 10     // seconds
 const MainKey = 1           // ID of main key
 const MnemonicEntropyBits = 256

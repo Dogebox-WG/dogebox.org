@@ -9,7 +9,7 @@ dkm: clean
 
 dev:
 	mkdir -p storage
-	go run .
+	go run . -dir ~/data
 
 test:
 	go test -v .
