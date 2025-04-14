@@ -1,5 +1,6 @@
 {
   "root": true,
   "title": "Dogenet",
-  "icon": ""
+  "icon": "",
+  "pages": ["index", "handlers"]
 }

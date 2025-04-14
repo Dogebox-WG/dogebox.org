@@ -1,0 +1,13 @@
+{
+  "root": true,
+  "title": "Dogebox Development",
+  "icon": "",
+  "pages": [
+    "---Overview---",
+    "components",
+    "concepts",
+    "---Setup---",
+    "setup",
+    "building"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "root": true,
+  "title": "Pup Development",
+  "icon": "",
+  "pages": [
+    "index",
+    "---Pup Requirements---",
+    "manifest",
+    "nix",
+    "---Features---",
+    "communication",
+    "dependencies",
+    "metrics"
+  ]
+}

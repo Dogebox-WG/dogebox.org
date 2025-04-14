@@ -1,5 +1,24 @@
 ---
-title: Dogenet
+title: Overview
 ---
 
-Coming Soon.
+DogeNet is a service that implements the _Doge Gossip Protocol_, which is a
+multi-channel protocol for communicating among Dogenet nodes.
+
+It is a foundational piece for future experimental protocols (Project Sakura),
+and provides useful side-channels for Dogecoin adjacent projects to communicate
+without polluting the Dogecoin blockchain, where simple peer-to-peer
+communication is sufficient.
+
+DogeNet builds a database of active DogeBox nodes, which is used to find peer
+nodes to connect to. DogeNet maintains a connection to at least 6 peers at all
+times (more if running novel protocol-handlers that require connecting to other
+participating nodes.)
+
+DogeNet exposes a local UNIX-domain socket for custom Protocol Handlers to connect to
+DogeNet and send/receive messages on any channels they're interested in.
+
+Channels are assigned to different protocols; for example, DogeNet nodes announce
+their presence and public address on the `'Node` channel; DogeBoxes can optionally
+announce an identity profile on the `'Iden'` channel, for display on the DogeMap and
+for use in future social pups.

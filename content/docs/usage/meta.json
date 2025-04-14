@@ -1,5 +1,14 @@
 {
   "root": true,
-  "title": "Usage",
-  "icon": ""
+  "title": "Setting up Dogebox",
+  "icon": "",
+  "pages": [
+    "index",
+    "---Setting Up---",
+    "getting-dogebox",
+    "installing",
+    "setup",
+    "---Usage---",
+    "...usage"
+  ]
 }

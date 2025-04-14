@@ -1,0 +1,15 @@
+---
+title: Dogeboxd
+---
+
+Dogebox runs a daemon process 'dogeboxd' which provides installation
+and orchestration of Pups which are run in isolated containers via
+Linux Systemd / Linux Namespaces.
+
+Dogeboxd manages inter-pup communications via nix-config rules, exposing
+TCP ports between containers, and proxying REST APIs as required for Pups
+to communicate with their dependencies, in accordance with their manifest rules.
+
+This is all done in aid of providing an easy to use platform for Dogecoin
+users that can provide a secure runtime environment for Dogecoin adventurers
+who are not Linux administrators.
