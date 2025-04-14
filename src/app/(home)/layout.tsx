@@ -15,12 +15,12 @@ export default function Layout({ children }: { children: ReactNode }) {
        {
         text: 'Dogebox Development',
         type: 'main',
-        url: '/docs/dogebox-development',
+        url: '/docs/dogebox',
        },
        {
         text: 'Pup Development',
         type: 'main',
-        url: '/docs/pup-development',
+        url: '/docs/pup',
        },
        {
         text: 'DKM',
