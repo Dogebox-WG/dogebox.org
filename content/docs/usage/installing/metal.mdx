@@ -2,4 +2,40 @@
 title: Bare Metal
 ---
 
-Coming Soon.
+## Requirements [#requirements]
+
+Dogebox requires the following hardware specs to run:
+
+<Card>
+- UEFI Support
+- `>1gb` RAM
+- `>50gb` Disk Space (`>300gb` if you want to sync the blockchain)
+
+</Card>
+
+It is possible to install Dogebox to one hard drive and use another as your "storage" device. This is configured during initial setup.
+
+## 1) Download the ISO image [#download]
+
+Follow the instructions in [Getting Dogebox](/docs/usage/getting-dogebox) to get an applicable ISO image.
+
+## 2) Write the ISO to a USB drive [#write]
+
+Now that you have downloaded the ISO image, you need to write it to a USB drive to boot.
+
+We recommend using [Belena Etcher](https://etcher.balena.io/).
+
+- Open Balena Etcher
+- Click Select iamge and navigate to the location of your downloaded and decompressed .iso
+- Click Select Drive and choose your USB drive.
+- Click Flash and wait for the flashing process to finish
+
+## 3) Boot from the USB drive [#boot]
+
+Insert your USB drive into your machine and boot from it. Selecting the USB to boot is typically machine dependant, for example on a PC it is often `F12` or `Delete`.
+
+If you have trouble, try booting into your BIOS / UEFI and manually select the drive to boot from.
+
+## 4) Configure [#configure]
+
+Once you have booted from the USB drive, please continue with the [installation guide](/docs/usage/setup/access).

@@ -2,4 +2,16 @@
 title: Generic VM
 ---
 
-Coming Soon.
+Any VM software capable of booting from an ISO image should work.
+
+<Callout>
+We currently only release `x86_64` and `aarch64` (`ARM64`) images, other architectures may work if you manually build your own ISO image.
+</Callout>
+
+A few things to note:
+
+- The ISO images currently only support UEFI boot.
+- We recommend `>4gb` of ram, but as low as `1gb` should suffice.
+- A couple of cores should be the minimum, especially if you plan to install a <b><i>Dogecoin Core</i></b> node.
+- A way to directly hit your VM on specific ports is necessary.
+- Bridged networking mode is the easiest, but some VM software let you forward specific ports. If you do this, `8080` and `3000` are necessary for the Web UI to work, along with other ports specified in [Forwarding Ports](/docs/usage/ports).
