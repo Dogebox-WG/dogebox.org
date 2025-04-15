@@ -31,7 +31,7 @@ export default function HomePage() {
                 src="/static/image/dogebox-t6.png" 
                 alt="Dogebox T6" 
                 width={300}
-                height={290}
+                height={300}
                 className="w-48 object-contain"
               />
             </div>
@@ -43,7 +43,13 @@ export default function HomePage() {
             className="flex flex-col items-center p-8 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300"
           >
             <div className="h-48 flex items-center justify-center mb-4">
-              <BookOpen className="w-48 h-48 text-green-600" />
+              <Image
+                src="/static/image/doge-docs.svg"
+                alt="Dogebox Docs"
+                width={300}
+                height={300}
+                className="w-48 object-contain"
+              />
             </div>
             <h2 className="text-xl font-semibold text-center mt-auto">View Docs</h2>
           </Link>
