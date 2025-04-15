@@ -20,6 +20,27 @@ A pup requires at least two files:
 
 Pups are also free to ship any other assets that might be required, such as scripts, frontend UI files etc.
 
+import { File, Folder, Files } from 'fumadocs-ui/components/files';
+
+An example pup directory structure:
+
+<Files>
+  <Folder name="my-pup" defaultOpen>
+    <File name="manifest.json" />
+    <File name="pup.nix" />
+    <Folder name="my-pup-ui" defaultOpen>
+      <File name="index.html" />
+      <File name="style.css" />
+      <File name="script.js" />
+    </Folder>
+    <Folder name="my-pup-backend" defaultOpen>
+      <File name="main.go" />
+      <File name="go.mod" />
+      <File name="go.sum" />
+    </Folder>
+  </Folder>
+</Files>
+
 ## How Pups Work in Dogebox [#how]
 
 When you install a pup:

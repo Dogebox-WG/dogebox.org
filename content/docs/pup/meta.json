@@ -4,13 +4,17 @@
   "icon": "",
   "pages": [
     "index",
+    "sources",
     "---Pup Requirements---",
     "manifest",
     "nix",
     "---Features---",
+    "environment",
     "communication",
     "dependencies",
     "metrics",
-    "keys"
+    "keys",
+    "---Development---",
+    "...development"
   ]
 }

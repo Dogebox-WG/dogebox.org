@@ -1,0 +1,42 @@
+---
+title: Environment Variables
+---
+
+The Dogebox runtime injects a number of environment variables into your pup for ease of use.
+
+## Static Variables
+
+These variables are always available inside your pup.
+
+### `DBX_HOST` [#DBX_HOST]
+
+The host of the Dogeboxd router that you can hit from inside your pup.
+
+**Example:** `10.69.0.1`
+
+### `DBX_PORT` [#DBX_PORT]
+
+The port of the Dogeboxd router that you can hit from inside your pup.
+
+**Example:** `8080`
+
+### `DBX_PUP_ID` [#DBX_PUP_ID]
+
+The generated runtime ID of your pup.
+
+**Example:** `436ab5c0-2b79-48f0-8e00-fbd6df02e458`
+
+### `DBX_PUP_IP` [#DBX_PUP_IP]
+
+The runtime IP that has been assigned to your pup.
+
+**Example:** `10.69.0.2`
+
+## Dependency Interfaces
+
+For each dependency configured for your pup, the Dogebox runtime will inject a set of the following variables, where `:iface:` is the configured interface name in your manifest file.
+
+### `DBX_IFACE_:iface:_NAME` [#DBX_IFACE_:iface:_NAME]
+### `DBX_IFACE_:iface:_HOST` [#DBX_IFACE_:iface:_HOST]
+### `DBX_IFACE_:iface:_PORT` [#DBX_IFACE_:iface:_PORT]
+
