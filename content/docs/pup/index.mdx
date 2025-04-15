@@ -3,4 +3,41 @@ title: Overview
 
 ---
 
-Coming Soon.
+A **pup** (short for **Packaged Up Program**) is a modular, self-contained application designed to run inside the [Dogebox](https://dogebox.org) ecosystem. Pups provide an easy, secure, and repeatable way to deploy software that interacts with the Dogecoin blockchain or other services.
+
+## Key Features
+
+- **Isolated**: Each pup runs in its own Linux container environment with strict boundaries and no permissions by default.
+- **Composable**: Pups can talk to each other using a permission-controlled internal network.
+- **Decentralized**: Pups can be installed from any source, including public Git repositories, or private sources like your own local hard drive.
+
+## Anatomy of a Pup [#anatomy]
+
+A pup requires at least two files:
+
+- [`manifest.json`](/docs/pup/manifest): Metadata that describes the pup's name, version, permissions, and how it should run.
+- [`pup.nix`](/docs/pup/nix): The Nix expression that builds and configures the pup.
+
+Pups are also free to ship any other assets that might be required, such as scripts, frontend UI files etc.
+
+## How Pups Work in Dogebox [#how]
+
+When you install a pup:
+
+1. The pup is downloaded from the source you specify.
+2. Dogebox verifies its metadata and other configuration options.
+3. If required, prompts the user to confirm any additional permissions or dependencies.
+4. Builds and installs the pup as an isolated container, using NixOS and `nspawn`.
+5. Dogebox starts the pup as a managed service, routing any ports, dependencies, and APIs.
+
+## Use Cases [#uses]
+
+Any piece of software that can be packaged up and run inside a container can be a pup.
+
+Potential examples:
+
+- Run a full Dogecoin node with minimal setup.
+- Launch a payment processor or gateway.
+- Deploy a Dogecoin block explorer.
+- Host a web UI for interacting with your wallet or smart contracts.
+- Build your own service and share it with others through the Pup Store.

@@ -10,6 +10,7 @@
     "---Features---",
     "communication",
     "dependencies",
-    "metrics"
+    "metrics",
+    "keys"
   ]
 }

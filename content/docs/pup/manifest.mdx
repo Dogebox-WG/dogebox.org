@@ -2,4 +2,151 @@
 title: Manifest File
 ---
 
-Coming Soon.
+A file called `manifest.json` is required for every pup. This file is consumed by Dogebox and describes metadata about the pup, as well as dependencies, ports to share, and a bunch of other configurable information.
+
+## Example
+
+```json
+
+```
+
+## Reference
+
+<TypeTable
+  type={{
+    manifestVersion: { type: 'number', required: true, description: "Must explicitly be set to `1`" },
+    meta: { type: 'PupManifestMeta', required: true, typeDescriptionLink: '/docs/pup/manifest#PupManifestMeta' },
+    container: { type: 'PupManifestContainer', required: true, typeDescriptionLink: '/docs/pup/manifest#PupManifestContainer' },
+    interfaces: { type: 'PupManifestInterface[]', default: '[]', typeDescriptionLink: '/docs/pup/manifest#PupManifestInterface' },
+    dependencies: { type: 'PupManifestDependency[]', default: '[]', typeDescriptionLink: '/docs/pup/manifest#PupManifestDependency' },
+    metrics: { type: 'PupManifestMetric[]', default: '[]', typeDescriptionLink: '/docs/pup/manifest#PupManifestMetric' },
+  }}
+/>
+
+
+## Types
+
+These types may be slightly out of date. For the moment, please confirm with the [`manifest.go`](https://github.com/dogeorg/dogeboxd/blob/main/pkg/manifest.go) file in the Dogebox source code.
+
+import { TypeTable } from 'fumadocs-ui/components/type-table'
+
+### PupManifestMeta [#PupManifestMeta]
+
+<TypeTable
+  type={{
+    name: { type: 'string', required: true },
+    version: { type: 'string', required: true },
+    logoPath: { type: 'string' },
+    shortDescription: { type: 'string' },
+    longDescription: { type: 'string' },
+    upstreamVersions: { type: 'Record<string, string>' },
+  }}
+/>
+
+### PupManifestContainer [#PupManifestContainer]
+
+<TypeTable
+  type={{
+    build: { type: 'PupManifestBuild', required: true, typeDescriptionLink: '/docs/pup/manifest#PupManifestBuild' },
+    services: { type: 'PupManifestService[]', required: true, default: '[]', typeDescriptionLink: '/docs/pup/manifest#PupManifestService' },
+    exposes: { type: 'PupManifestExposeConfig[]', default: '[]', typeDescriptionLink: '/docs/pup/manifest#PupManifestExposeConfig' },
+    requiresInternet: { type: 'boolean', default: 'false' },
+  }}
+/>
+
+### PupManifestBuild [#PupManifestBuild]
+
+<TypeTable
+  type={{
+    nixFile: { type: 'string', required: true },
+    nixFileSha256: { type: 'string', required: true },
+  }}
+/>
+
+### PupManifestService [#PupManifestService]
+
+<TypeTable
+  type={{
+    name: { type: 'string', required: true },
+    command: { type: 'PupManifestCommand', required: true, typeDescriptionLink: '/docs/pup/manifest#PupManifestCommand' },
+  }}
+/>
+
+### PupManifestCommand [#PupManifestCommand]
+
+<TypeTable
+  type={{
+    exec: { type: 'string', required: true },
+    cwd: { type: 'string', required: true },
+    env: { type: 'Record<string, string>', default: '{}' },
+  }}
+/>
+
+### PupManifestExposeConfig [#PupManifestExposeConfig]
+
+<TypeTable
+  type={{
+    name: { type: 'string', required: true },
+    type: { type: '"http" | "tcp"', required: true },
+    port: { type: 'number', required: true },
+    interfaces: { type: 'string[]', default: '[]' },
+    listenOnHost: { type: 'boolean', default: 'false' },
+    webUI: { type: 'boolean', default: 'false' },
+  }}
+/>
+
+### PupManifestInterface [#PupManifestInterface]
+
+<TypeTable
+  type={{
+    name: { type: 'string', required: true },
+    version: { type: 'string', required: true },
+    permissionGroups: { type: 'PupManifestPermissionGroup[]', required: true, default: '[]', typeDescriptionLink: '/docs/pup/manifest#PupManifestPermissionGroup' },
+  }}
+/>
+
+### PupManifestPermissionGroup [#PupManifestPermissionGroup]
+
+<TypeTable
+  type={{
+    name: { type: 'string', required: true },
+    description: { type: 'string' },
+    severity: { type: 'number', required: true },
+    routes: { type: 'string[]', default: '[]' },
+    port: { type: 'number', required: true },
+  }}
+/>
+
+### PupManifestDependency [#PupManifestDependency]
+
+<TypeTable
+  type={{
+    interfaceName: { type: 'string', required: true },
+    interfaceVersion: { type: 'string', required: true },
+    permissionGroups: { type: 'string[]', required: true, default: '[]' },
+    source: { type: 'PupManifestDependencySource', required: true, typeDescriptionLink: '/docs/pup/manifest#PupManifestDependencySource' },
+    optional: { type: 'boolean', default: 'false' },
+  }}
+/>
+
+### PupManifestDependencySource [#PupManifestDependencySource]
+
+<TypeTable
+  type={{
+    sourceLocation: { type: 'string', required: true },
+    pupName: { type: 'string', required: true },
+    pupVersion: { type: 'string', required: true },
+    pupLogoBase64: { type: 'string', required: true },
+  }}
+/>
+
+### PupManifestMetric [#PupManifestMetric]
+
+<TypeTable
+  type={{
+    name: { type: 'string', required: true },
+    label: { type: 'string', required: true },
+    type: { type: 'string', required: true },
+    history: { type: 'number' },
+  }}
+/>
