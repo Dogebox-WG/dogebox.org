@@ -54,37 +54,4 @@ sudo dd if=/Users/Shiba/Downloads/dogebox-v0.3.2-beta.3-t6.img | sudo pv | sudo 
 sudo diskutil eject /dev/disk1000
 ```
 ## 4) Setup [#setup]
-### With a monitor and keyboard available
-
-- Insert the microSD card with image flashed.
-- Ensure you have an ethernet cable plugged into your T6 box.
-- Plug in a HDMI screen, make sure it's plugged into HDMI1.
-- Plug in a keyboard.
-- Plug power in.
-- Wait until the box finishes booting, this could take anywhere from 2 to 10 minutes.
-- Once finished, login with the username shibe and the password suchpass.
-- Enter command ip addr and take note of your IP address.
-- Ignore the `lo: <LOOPBACK>` section, look for another one.
-- Look for a line that starts with inet followed by your IP address, in this example 192.168.1.5.
-- See the screenshot below.
-- In a web browser, visit http://your_ip_address:8080 to start configuring your Dogebox.
-- In this example, it would be http://192.168.1.5:8080 but your IP address will be different.
-- This will load the Dogebox Setup page.
-
-### Without a monitor and keyboard available
-- Insert the microSD card with image flashed.
-- Ensure you have an ethernet cable plugged into your T6 box.
-- Plug power in.
-- Wait until the box finishes booting, this could take anywhere from 2 to 10 minutes.
-- In a web browser, visit https://dogebox.local:8080 to start configuring your Dogebox.
-- This will load the Dogebox Setup page.
-
-## 4) Restart your Dogebox [#restart]
-If you choose to install Dogebox OS on the internal eMMC storage (recommended), the setup page will ask you to restart your Dogebox.
-
-Go back to the hardware T6 keyboard, and enter command sudo `shutdown -h now` to shut down cleanly.
-This also works if you want to shut down your Dogebox at any time (you may have to log in first)
-It's a good idea to do this every time you want to shut down the Dogebox, otherwise pulling the plug risks corrupting the eMMC storage or SD card, and you might have to wipe your Dogebox and start over (often it will recover, but not always)
-
-## 5) Shut Down your Dogebox [#shutdown]
-Descibed above under Restart your Dogebox
+Once you have a MicroSD card with the Dogebox image flashed onto it, follow the initial setup steps, starting with [Getting Access](/docs/usage/setup/access)
