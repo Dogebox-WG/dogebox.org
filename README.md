@@ -5,9 +5,9 @@ This is a Next.js application generated with
 
 ## Prerequisites
 
-[Next.js](https://nextjs.org)
+Install package dependencies
 ```bash
-npm install next
+npm install
 ```
 
 ## Run Development Server
