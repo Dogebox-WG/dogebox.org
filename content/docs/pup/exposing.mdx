@@ -1,0 +1,45 @@
+---
+title: Exposing Ports
+---
+
+As part of your pups [`manifest.json` file](/docs/pup/manifest), you can specify ports to expose.
+
+## Public TCP Ports [#public-ports]
+
+If you want your pup to be accessible on specific ports, you can specify them in the `expose` section of your manifest.
+
+```json
+{
+  ...,
+  "exposes": [
+    {
+      "name": "my-port",
+      "type": "tcp",
+      "port": 8080,
+      "listenOnHost": true
+    }
+  ]
+}
+```
+
+This config makes your pup accessible on port `8080` of the host machine, specifically because we have set `listenOnHost` to `true`.
+
+Setting this value to `false` will make the port accessible, but only when you explicitly hit the container that your pup is running in.
+
+<Callout type="warn">
+It should be obvious, but only a single pup can listen on a port at a time. There are also some reserved ports that cannot be used.
+</Callout>
+
+
+## Private Admin UI [#admin-ui]
+
+You are also able to set the `webUI` flag to `true` in your manifest, on an `exposes` entry.
+
+If set, the Dogebox UI will display a button called `Launch <name>` where `<name>` is the `name` of the `exposes` entry.
+
+Examples:
+
+<div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+  <img src="/static/image/docs/pups/adminui1.png" alt="Admin UI 1" style={{ width: '50%' }} />
+  <img src="/static/image/docs/pups/adminui2.png" alt="Admin UI 2" style={{ width: '50%' }} />
+</div>

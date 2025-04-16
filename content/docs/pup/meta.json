@@ -10,10 +10,12 @@
     "nix",
     "---Features---",
     "environment",
+    "storage",
     "communication",
     "dependencies",
     "metrics",
     "keys",
+    "exposing",
     "---Development---",
     "...development"
   ]

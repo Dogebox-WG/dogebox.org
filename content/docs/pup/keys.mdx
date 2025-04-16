@@ -2,4 +2,20 @@
 title: Key Delegation
 ---
 
-Coming Soon.
+When your pup is installed by a user, Dogeboxd will generate a secure keypair for you to use.
+
+This key is a child delegate key, derived from the user's Dogeboxd root key.
+
+You are able to use this key in place of any other private key in your pup.
+
+<Callout>
+Please see [`Storage`](/docs/pup/storage) for more information on how to use the `storage` directory.
+</Callout>
+
+## `/storage/delegated.key` [#delegated-key]
+
+The private key, stored as a hex-encoded EC private key.
+
+## `/storage/delegated.extended.key` [#extended-key]
+
+This is the same private key, stored with extended formatting, for use with hierarchical deterministic derivation.

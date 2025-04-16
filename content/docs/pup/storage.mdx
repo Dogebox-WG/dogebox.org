@@ -1,0 +1,25 @@
+---
+title: Storage
+---
+
+When your pup is installed by a user, it's given its own secure storage directory to use. The rest of the filesystem other than this directory is marked as `read-only`, and is actually ephemeral.
+
+## `/storage` [#storage]
+
+<Callout type="info">Read-Write</Callout>
+
+A directory named `/storage` is created at the root of your pups filesystem. This is the only directory that you can write to, and is persisted across reboots.
+
+Any data your pup needs to store should be stored in this directory.
+
+This directory will be empty, other than the [Generated Keys](/docs/pup/keys) that are created when your pup is installed.
+
+## `/pup` [#pup]
+
+<Callout type="warn">Read-Only</Callout>
+
+Another directory named `/pup` is created at the root of your pups filesystem.
+
+This directory, also marked as `read-only`, contains a copy of your pups source code.
+
+This may be useful if you need to retrieve assets from your pup that live outside any binaries that run.
