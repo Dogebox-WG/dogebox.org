@@ -10,7 +10,7 @@ and provides useful side-channels for Dogecoin adjacent projects to communicate
 without polluting the Dogecoin blockchain, where simple peer-to-peer
 communication is sufficient.
 
-DogeNet builds a database of active DogeBox nodes, which is used to find peer
+DogeNet builds a database of active Dogebox nodes, which is used to find peer
 nodes to connect to. DogeNet maintains a connection to at least 6 peers at all
 times (more if running novel protocol-handlers that require connecting to other
 participating nodes.)
@@ -19,6 +19,6 @@ DogeNet exposes a local UNIX-domain socket for custom Protocol Handlers to conne
 DogeNet and send/receive messages on any channels they're interested in.
 
 Channels are assigned to different protocols; for example, DogeNet nodes announce
-their presence and public address on the `'Node` channel; DogeBoxes can optionally
+their presence and public address on the `'Node` channel; Dogeboxes can optionally
 announce an identity profile on the `'Iden'` channel, for display on the DogeMap and
 for use in future social pups.
