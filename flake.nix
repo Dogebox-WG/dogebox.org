@@ -14,6 +14,35 @@
             pkgs.go_1_22
           ];
         };
+
+        packages = rec {
+          dkm = pkgs.buildGoModule {
+            name = "dkm";
+            src = ./.;
+
+            vendorHash = "sha256-9smxGxt+XHXc6KZnGxCQ9SlFGPu7BmsLATV/O4fybFU=";
+
+            buildPhase = "make";
+
+            nativeBuildInputs = [ pkgs.go_1_22 ];
+            buildInputs = [];
+
+            installPhase = ''
+              mkdir -p $out/bin
+              cp dkm $out/bin/
+            '';
+
+            meta = with pkgs.lib; {
+              description = "Doge Key Manager";
+              homepage = "https://github.com/dogeorg/dkm";
+              license = licenses.mit;
+              maintainers = with maintainers; [ dogecoinfoundation ];
+              platforms = platforms.all;
+            };
+          };
+
+          default = dkm;
+        };
       }
     );
 }
