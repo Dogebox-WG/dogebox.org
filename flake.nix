@@ -43,6 +43,9 @@
 
           default = dkm;
         };
+
+        dbxSessionName = "dkm";
+        dbxStartCommand = "make dev";
       }
     );
 }
