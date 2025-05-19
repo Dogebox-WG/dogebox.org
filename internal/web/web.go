@@ -297,6 +297,14 @@ func (a *WebAPI) changePassword(w http.ResponseWriter, r *http.Request) {
 
 		if hasPass {
 			err = a.keymgr.ChangePassword(pass, newpass)
+			if err != nil {
+				if errors.Is(err, keymgr.ErrWrongPassword) {
+					sendError(w, http.StatusForbidden, "password", "password", options)
+				} else {
+					sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
+				}
+				return
+			}
 		} else {
 			// Handle seedphrase as a string with flexible separators
 			seedString := strings.TrimSpace(args.Seedphrase)
@@ -310,14 +318,9 @@ func (a *WebAPI) changePassword(w http.ResponseWriter, r *http.Request) {
 				if errors.Is(err, keymgr.ErrWrongMnemonic) {
 					log.Printf("[dkm] change-password: seedphrase validation failed - mnemonic does not match existing key")
 				}
-				sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
+				sendError(w, http.StatusInternalServerError, "seedphrase", "seedphrase", options)
 				return
 			}
-		}
-
-		if err != nil {
-			sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
-			return
 		}
 
 		// response
@@ -374,7 +377,11 @@ func (a *WebAPI) recoverPassword(w http.ResponseWriter, r *http.Request) {
 		// attempt to change the password
 		err = a.keymgr.RecoverPassword(args.Seedphrase, newpass)
 		if err != nil {
-			sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
+			if errors.Is(err, keymgr.ErrWrongMnemonic) {
+				sendError(w, http.StatusForbidden, "password", "password", options)
+			} else {
+				sendError(w, http.StatusInternalServerError, codeForErr(err), err.Error(), options)
+			}
 			return
 		}
 
