@@ -1,0 +1,87 @@
+---
+title: Troubleshooting Dogebox
+---
+
+Common issues and how to resolve them.
+
+# Dogebox not booting
+
+You've turned your dogebox on, but it is just not booting. The SYS LED is constantly on.
+
+We need to perform a boot loader re-initialisation.
+
+WARNING! This will completety erase your current installation and any data that may exist already.
+
+Please make sure you have backups of any important data before continuing.
+
+## Prerequisites
+
+- Dogebox
+- Power Supply
+- Laptop/Desktop host machine to run our recovery commands
+- USB cable with USB-C on one end and an appriprate connector for our host machine
+- [Boot firmware from friendlyelec](http://112.124.9.243/dvdfiles/RK3588/tools/MiniLoaderAll.bin)
+
+Download the RkDevTools for your respective host operating system.
+
+### macOs
+
+We recommend using homebrew to manage the dependencies
+
+```bash
+brew install automake autoconf libusb pkg-config git wget
+git clone https://github.com/rockchip-linux/rkdeveloptool
+cd rkdeveloptool
+autoreconf -i
+make
+cp rkdeveloptool /opt/homebrew/bin
+```
+
+### Linux
+
+### Windows
+
+## Connect the machines together
+
+Attach the USB cable to the host machine in an available USB port.
+Connect the USB-C plug to the front of the Dogebox.
+
+## Enter Maskrom mode
+
+The boot loader recovery process starts by putting the dogebox hardware into
+what is called maskrom mode, this mode allows an attached computer to send commands
+and updated firmware to the dogebox.
+
+To enter Maskrom mode, hold down the Maskrom button with a pointy tool while
+plugging in the powersupply. Hold the button down for at leasst 3 seconds after
+the SYS LED has turned on.
+
+When the button is released the hardware is in Maskrom mode.
+
+## mscOS
+
+To verify we're connected correctly to the maskrom mode of the dogebox hardware:
+
+`rkdeveloptool ld`
+
+This lists the available devices and should show something like:
+
+`DevNo=1	Vid=0x2207,Pid=0x350b,LocationID=200	Maskrom`
+
+First step is to erase the flash
+
+`rkceveloptool ef`
+
+then we copy over the boot loader image
+
+`sudo rkdeveloptool db MiniLoaderAll.bin`
+
+We can then reset the device
+
+`rkdeveloptool rd`
+
+After this we should be able to load the SD Card into the dogebox and restart the machine.
+
+## linux
+
+## Windows
