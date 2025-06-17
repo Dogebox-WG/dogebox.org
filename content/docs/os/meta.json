@@ -1,0 +1,5 @@
+{
+  "root": true,
+  "title": "Dogebox OS",
+  "pages": ["hardware", "building", "troubleshooting"]
+}
