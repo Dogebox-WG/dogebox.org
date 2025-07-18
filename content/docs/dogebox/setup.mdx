@@ -2,6 +2,8 @@
 title: Development Environment Setup
 ---
 
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+
 The Dogebox exclusively runs on NixOS as its linux-base.
 
 ### Install NixOS in a VM
@@ -24,131 +26,125 @@ Please note: `dogeboxd` & `dpanel` must be cloned into the same parent directory
 
 As we're running a development environment, some things must be configured manually.
 
-#### Import `dogebox.nix`
+<Accordions>
+  <Accordion title="(1) Configure required packages">
+    Edit `/etc/nixos/configuration.nix`. Inside the main `{ ... }` block, please add:
 
-Edit `/etc/nixos/configuration.nix`. Towards the top of the file there should be an `imports` section.
+    ```nix
+    environment.systemPackages = [ pkgs.git pkgs.vim ];
+    ```
+  </Accordion>
+  <Accordion title="(2) Import dogebox.nix">
+    Edit `/etc/nixos/configuration.nix`. Towards the top of the file there should be an `imports` section.
 
-Please modify it to conditionally include the `dogebox.nix` file that will live in `$HOME/data/nix/dogebox.nix`
+    Please modify it to conditionally include the `dogebox.nix` file that will live in `$HOME/data/nix/dogebox.nix`
 
-For example, if your existing imports block looks like:
+    For example, if your existing imports block looks like:
 
-```nix
-  imports =
-    [
-      "${modulesPath}/virtualisation/lxc-container.nix"
-      ./lxd.nix
-    ];
-```
+    ```nix
+      imports =
+        [
+          "${modulesPath}/virtualisation/lxc-container.nix"
+          ./lxd.nix
+        ];
+    ```
 
-Please change it to:
+    Please change it to:
 
-```nix
-  imports =
-    [
-      "${modulesPath}/virtualisation/lxc-container.nix"
-      ./lxd.nix
-    ] ++ lib.optionals (builtins.pathExists "/home/$USER/data/nix/dogebox.nix") [
-      /home/$USER/data/nix/dogebox.nix
-    ];
-```
+    ```nix
+      imports =
+        [
+          "${modulesPath}/virtualisation/lxc-container.nix"
+          ./lxd.nix
+        ] ++ lib.optionals (builtins.pathExists "/home/$USER/data/nix/dogebox.nix") [
+          /home/$USER/data/nix/dogebox.nix
+        ];
+    ```
 
-Where `$USER` is the user you have inside your NixOS VM.
+    Where `$USER` is the user you have inside your NixOS VM.
+  </Accordion>
+  <Accordion title="(3) Configure security wrappers">
+    Edit `/etc/nixos/configuration.nix`. Inside the main `{ ... }` block, please add:
 
-#### Add required packages
+    ```nix
+    security.wrappers.dbx = {
+      source = "/home/$USER/dogeboxd/build/dbx";
+      owner = "$USER";
+      group = "users";
+    };
 
-Edit `/etc/nixos/configuration.nix`. Inside the main `{ ... }` block, please add:
+    security.wrappers.dogeboxd = {
+      source = "/home/$USER/dogeboxd/build/dogeboxd";
+      capabilities = "cap_net_bind_service=+ep";
+      owner = "$USER";
+      group = "users";
+    };
 
-```nix
-environment.systemPackages = [ pkgs.git pkgs.vim ];
-```
+    security.wrappers._dbxroot = {
+      source = "/home/$USER/dogeboxd/build/_dbxroot";
+      owner = "root";
+      group = "root";
+      setuid = true;
+    };
+    ```
 
-nb. Vim is not required, but lots of people get annoying that it is not available :)
+    **Please note:** Please fix these paths, they assume you have cloned `dogeboxd` into the users home directory. If you cloned them elsewhere, update the paths.
+    **Please note:** There are multiple instances of `$USER` that need replacing, please update all of them.
+  </Accordion>
+  <Accordion title="(4) Enable experimental features">
+    Edit `/etc/nixos/configuration.nix`. Inside the main `{ ... }` block, please add:
 
-#### Add required security wrappers
+    ```nix
+    nix.settings.experimental-features = [ "nix-command" "flakes" ];
+    ```
+  </Accordion>
+</Accordions>
+#### Example modified configuration file
 
-Edit `/etc/nixos/configuration.nix`. Inside the main `{ ... }` block, please add:
+<Accordions>
+  <Accordion title="Example">
+  For a user named `mytestuser`.
 
-```nix
-security.wrappers.dbx = {
-  source = "/home/$USER/dogeboxd/build/dbx";
-  owner = "$USER";
-  group = "users";
-};
+  ```nix
+  { lib, config, pkgs, modulesPath, ... }:
 
-security.wrappers.dogeboxd = {
-  source = "/home/$USER/dogeboxd/build/dogeboxd";
-  capabilities = "cap_net_bind_service=+ep";
-  owner = "$USER";
-  group = "users";
-};
+  {
+    imports =
+      [
+        ..snip..
+      ] ++ lib.optionals (builtins.pathExists "/home/mytestuser/data/nix/dogebox.nix") [
+        /home/mytestuser/data/nix/dogebox.nix
+      ];
 
-security.wrappers._dbxroot = {
-  source = "/home/$USER/dogeboxd/build/_dbxroot";
-  owner = "root";
-  group = "root";
-  setuid = true;
-};
-```
+    nix.settings.experimental-features = [ "nix-command" "flakes" ];
+    environment.systemPackages = [ pkgs.git pkgs.vim ];
 
-**Please note:** Please fix these paths, they assume you have cloned `dogeboxd` into the users home directory. If you cloned them elsewhere, update the paths.
-**Please note:** There are multiple instances of `$USER` that need replacing, please update all of them.
+    security.wrappers.dbx = {
+      source = "/home/mytestuser/dogeboxd/build/dbx";
+      owner = "mytestuser";
+      group = "users";
+    };
 
-#### Additionally, enable these necessary experimental features:
+    security.wrappers.dogeboxd = {
+      source = "/home/mytestuser/dogeboxd/build/dogeboxd";
+      capabilities = "cap_net_bind_service=+ep";
+      owner = "mytestuser";
+      group = "users";
+    };
 
-```
-nix.settings.experimental-features = [ "nix-command" "flakes" ];
-```
+    security.wrappers._dbxroot = {
+      source = "/home/mytestuser/dogeboxd/build/_dbxroot";
+      owner = "root";
+      group = "root";
+      setuid = true;
+    };
 
-#### Example modified configuration file (specific to Macos+Orbstack users)
-
-This is how a configuration.nix file appears for a developer running Orbstack on Macos.
-
-```
-{ config, pkgs, modulesPath, ... }:
-
-{
-  imports =
-    [
-      # Include the default lxd configuration.
-      "${modulesPath}/virtualisation/lxc-container.nix"
-      # Include the container-specific autogenerated configuration.
-      ./incus.nix
-      # Include the OrbStack-specific configuration.
-      ./orbstack.nix
-      # Include the Dogebox specific configuration
-      "/home/pat/data/nix/dogebox.nix"
-    ];
-
-  # Enable these necessary experimental features
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
-
-  # Add Vim (optional)
-  environment.systemPackages = [ pkgs.git pkgs.vim ];
-
-  security.wrappers.dbx = {
-    source = "/Users/pat/dev/dogeboxd/build/dbx";
-    owner = "pat";
-    group = "users";
+    .. snip ..
   };
+    ```
+  </Accordion>
+</Accordions>
 
-  security.wrappers.dogeboxd = {
-    source = "/Users/pat/dev/dogeboxd/build/dogeboxd";
-    capabilities = "cap_net_bind_service=+ep";
-    owner = "pat";
-    group = "users";
-  };
-
-  security.wrappers._dbxroot = {
-    source = "/Users/pat/dev/dogeboxd/build/_dbxroot";
-    owner = "root";
-    group = "root";
-    setuid = true;
-  };
-
-  users.users.pat = {
-    ... // unchanged
-  }
-  ```
 
 #### Rebuild
 
@@ -160,7 +156,7 @@ Please run: `sudo nixos-rebuild switch`. Assuming this succeeds, you're ready to
 
 You need to be running `dogeboxd` and `dkm` at the same time to have things working. `dpanel` is served via `dogeboxd` automatically, assuming they've been cloned into the same parent directory.
 
-Both services contain a `shell.nix` which provides all the necessary dependencies for executing the service.
+Both services contain a nix flake, which provide pre-configured devshells that have all the necessary dependencies for executing the service.
 
 Both services also contain a `Makefile` that provides a `dev` command that run things in a "default" development mode.
 
@@ -168,7 +164,7 @@ Both services also contain a `Makefile` that provides a `dev` command that run t
 
 ```bash
 cd dogeboxd
-nix-shell
+nix develop
 make dev
 ```
 
@@ -176,11 +172,13 @@ make dev
 
 ```bash
 cd dkm
-nix-shell
+nix develop
 make dev
 ```
 
-`dogeboxd` should now be listening on [http://127.0.0.1:3000](http://127.0.0.1:3000) and should be ready in setup mode.
+`dogeboxd` should now be listening on two ports:
+  - Dogeboxd API will be listening at [http://127.0.0.1:3000](http://127.0.0.1:3000)
+  - Dpanel UI will be listening at [http://127.0.0.1:8080](http://127.0.0.1:8080) and should be ready in setup mode.
 
 After initial setup has completed, you will need to re-run `make dev` for `dogeboxd` to launch it again in normal-mode. Please see below for more details.
 

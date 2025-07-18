@@ -1,5 +1,50 @@
 ---
-title: Building release images
+title: Building OS images
 ---
 
-Coming Soon.
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+
+This requires you have the [`os`](https://github.com/dogebox-wg/os) repository is cloned and available.
+
+This repository contains a nix `flake.nix` file that describes how the OS should be configured.
+
+### Requirements
+<Accordions>
+  <Accordion title="Building on Darwin (MacOS)">
+    Unfortunately, you cannot build these OS images from a Darwin (MacOS) environment. Please install Nix (or NixOS) in a VM to continue.
+  </Accordion> 
+  <Accordion title="Building on Linux (x86_64)">
+    In order to build `aarch64` images from `x86_64`, you must be running NixOS, and also enable the following configuration in your `/etc/nixos/configuration.nix` file:
+
+    ```nix
+      boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
+    ```
+
+    Please note that this is **slow**, and you're better off configuring a remote aarch64 nix builder if possible.
+
+    If you're only interested in building `x86_64` images, you can skip the above.
+  </Accordion>
+  <Accordion title="Building on Linux (aarch64)">
+    No need to do anything. You're set.
+  </Accordion>
+</Accordions>
+
+## Building
+
+The nix flake exposes 5 different OS derivations that you can build. These are:
+
+- `.#packages.aarch64-linux.iso`
+- `.#packages.aarch64-linux.qemu`
+- `.#packages.aarch64-linux.t6`
+- `.#packages.x86_64-linux.iso`
+- `.#packages.x86_64-linux.qemu`
+
+You can build these by running the following command:
+
+```bash
+nix build <target> -L --print-out-paths
+```
+
+Where `<target>` is one of the above derivations (including the `.#` prefix).
+
+Passing `-L` will print logs for the build, and `--print-out-paths` will print the path to the built image once complete.
