@@ -14,7 +14,7 @@ title: Getting Access
 - Once finished, login with the username `shibe` and the password `suchpass`. You will be prompted to change the password.
 - Enter command `ip addr` and take note of your IP address.
 - Ignore the `lo: <LOOPBACK>` section, look for another one.
-- Look for a line that starts with inet followed by your IP address, in this example 192.168.1.5.
+- Look for a line that starts with inet followed by your IP address, in this example `192.168.1.5`. It may instead start with `10.` or `192.168` or `172.`.
 - See the screenshot below.
 - In a web browser, visit http://your_ip_address:8080 to start configuring your Dogebox.
 - In this example, it would be http://192.168.1.5:8080 but your IP address will be different.
@@ -31,19 +31,19 @@ title: Getting Access
 ### Restart your Dogebox
 If you choose to install Dogebox OS on the internal eMMC storage (recommended), the setup page will ask you to restart your Dogebox.
 
-Go back to the hardware T6 keyboard, and enter command `sudo shutdown -h now` to shut down cleanly.
+Go back to the hardware T6 keyboard, and enter command `sudo shutdown -r now` to shut down cleanly.
 This also works if you want to shut down your Dogebox at any time (you may have to log in first)
 It's a good idea to do this every time you want to shut down the Dogebox, otherwise pulling the plug risks corrupting the eMMC storage or SD card, and you might have to wipe your Dogebox and start over (often it will recover, but not always)
 
 ### Shut Down your Dogebox
-Descibed above under Restart your Dogebox
+Described above under Restart your Dogebox
 
 ## Virtual machine
 - Wait until the box finishes booting, this could take anywhere from 2 to 10 minutes.
 - Once finished, login with the username `shibe` and the password `suchpass`. You will be prompted to change the password.
 - Enter command `ip addr` and take note of your IP address.
 - Ignore the `lo: <LOOPBACK>` section, look for another one.
-- Look for a line that starts with inet followed by your IP address, in this example 192.168.1.5.
+- Look for a line that starts with inet followed by your IP address, in this example 192.168.1.5. It may instead start with `10.` or `192.168` or `172.`.
 - See the screenshot below.
 - In a web browser, visit http://your_ip_address:8080 to start configuring your Dogebox.
 - In this example, it would be http://192.168.1.5:8080 but your IP address will be different.

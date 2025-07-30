@@ -4,9 +4,9 @@ title: NanoPC T6
 
 ## Requirements / Things to note [#requirements]
 
-- A MicroSD card - we suggest 8GB minimum.
+- A MicroSD card, we suggest 8GB minimum.
 - Ethernet is required to be connected for the initial boot.
--  suchpass. Please do not deploy your box on any unsecured network, as anyone may be able to login to your T6. This will be rectified in a future release with proper SSH key management.
+- Default password `suchpass`. Please do not deploy your box on any unsecured network, as anyone may be able to login to your T6. This will be rectified in a future release with proper SSH key management.
 
 ## 1) Download the T6 image [#download]
 Follow the instructions in [Getting Dogebox](/docs/usage/getting-dogebox) to get a T6 compatible img.gz file.
@@ -18,7 +18,7 @@ The downloaded .img.gz file must be decompressed prior to being flashed to the M
 ## 3) Flash the image [#flash]
 There are a variety of tools which can be used to flash the image to the MicroSD card. Here are some we recommend:
 ### Balena Etcher
-- You can ger the latest version of Balena Etcher for your operating system at [https://etcher.balena.io](https://etcher.balena.io)
+- You can get the latest version of Balena Etcher for your operating system at [https://etcher.balena.io](https://etcher.balena.io)
 - Open Balena Etcher
 - Click Select image and navigate to the location of your downloaded and decompressed .img
 - Click Select Drive and choose the microSD card
@@ -36,21 +36,59 @@ There are a variety of tools which can be used to flash the image to the MicroSD
 Ensure the correct disk is used. Using the wrong disk here will result in data loss!
 </Callout>
 
-- Determine which disk is your MicroSD card.<br />
-MacOS: `diskutil list`<br />
-Linux: `lsblk -f`<br />
+#### macOS
+- Determine which disk is your MicroSD card:
+```bash
+diskutil list
+```
 This will likely be something like `/dev/disk1000`, remember to adjust all commands below with your target disk.
-- Unmount the disk
+- Unmount the disk:
 ```bash
 sudo diskutil umountDisk /dev/disk1000
 ```
-- Flash the image (Also update the path to your img file)
+- Flash the image (Also update the path to your img file):
 ```bash
 sudo dd if=/Users/Shiba/Downloads/dogebox-v0.3.2-beta.3-t6.img | sudo pv | sudo dd of=/dev/rdisk1000 bs=16m
 ```
-- Eject the disk
+- Eject the disk:
 ```bash
 sudo diskutil eject /dev/disk1000
+```
+
+#### Linux
+- Determine which disk is your MicroSD card:
+```bash
+lsblk -f
+```
+This will likely be something like `/dev/sdb`, remember to adjust all commands below with your target disk.
+- Unmount the disk:
+```bash
+sudo umount /dev/sdb1
+```
+- Flash the image (Also update the path to your img file):
+```bash
+sudo dd if=/home/user/Downloads/dogebox-v0.3.2-beta.3-t6.img | sudo pv | sudo dd of=/dev/sdb1 bs=16m
+```
+- Safely remove the disk:
+```bash
+sudo eject /dev/sdb
+```
+
+#### Windows
+- Determine which disk is your MicroSD card:
+```cmd
+wmic diskdrive list brief
+```
+This will show disk numbers like `\\.\PhysicalDrive1`, remember to adjust all commands below with your target disk.
+- Flash the image using PowerShell (Also update the path to your img file):
+```powershell
+# First, install pv if not available: choco install pv
+# Or use this alternative without pv:
+dd if=C:\Users\Shiba\Downloads\dogebox-v0.3.2-beta.3-t6.img of=\\.\PhysicalDrive1 bs=16M
+```
+- Safely eject the disk through Windows Explorer or use:
+```cmd
+eject /d
 ```
 ## 4) Setup [#setup]
 Once you have a MicroSD card with the Dogebox image flashed onto it, follow the initial setup steps, starting with [Getting Access](/docs/usage/setup/access)
