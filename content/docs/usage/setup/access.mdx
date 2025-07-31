@@ -3,8 +3,15 @@ title: Getting Access
 ---
 
 ## T6 Hardware
-### With a monitor and keyboard available
+### Without a monitor and keyboard available
+- Insert the microSD card with image flashed.
+- Ensure you have an ethernet cable plugged into your T6 box.
+- Plug power in.
+- Wait until the box finishes booting, this could take anywhere from 2 to 10 minutes.
+- In a web browser, visit https://dogebox.local:8080 to start configuring your Dogebox.
+- This will load the Dogebox Setup page.
 
+### With a monitor and keyboard available
 - Insert the microSD card with image flashed.
 - Ensure you have an ethernet cable plugged into your T6 box.
 - Plug in a HDMI screen, make sure it's plugged into HDMI1.
@@ -20,20 +27,12 @@ title: Getting Access
 - In this example, it would be http://192.168.1.5:8080 but your IP address will be different.
 - This will load the Dogebox Setup page.
 
-### Without a monitor and keyboard available
-- Insert the microSD card with image flashed.
-- Ensure you have an ethernet cable plugged into your T6 box.
-- Plug power in.
-- Wait until the box finishes booting, this could take anywhere from 2 to 10 minutes.
-- In a web browser, visit https://dogebox.local:8080 to start configuring your Dogebox.
-- This will load the Dogebox Setup page.
-
 ### Restart your Dogebox
-Once Dogebox OS is installed on the internal eMMC storage, the setup page will ask you to restart your Dogebox
+Once Dogebox OS is installed on the internal eMMC storage, the setup page will ask you to restart your Dogebox.
+Shutdown using the provided button in the UI, or go back to the hardware T6 keyboard, and enter command `sudo shutdown -h now`.
+Once shutdown is complete, remove the SD Card before powering on again by pressing the button on the side of the Dogebox.
 
-Go back to the hardware T6 keyboard, and enter command `sudo shutdown -r now` to shut down cleanly.
-This also works if you want to shut down your Dogebox at any time (you may have to log in first)
-It's a good idea to do this every time you want to shut down the Dogebox, otherwise pulling the plug risks corrupting the eMMC storage or SD card, and you might have to wipe your Dogebox and start over (often it will recover, but not always)
+Note that the shutdown command can be used at any other time to shutdown your Dogebox. It's a good idea to do this every time you want to shut down the Dogebox, otherwise pulling the plug risks corrupting the eMMC storage or SD card, and you might have to wipe your Dogebox and start over (often it will recover, but not always)
 
 ### Shut Down your Dogebox
 Described above under Restart your Dogebox
