@@ -2,4 +2,59 @@
 title: Configuration
 ---
 
-Coming Soon.
+
+## Configuration
+
+After the installation, you'll need to go through the initial configuration,
+
+#### 1) Terms [#configuration-1]
+
+Welcome to Dogebox! Please read and accept the terms and conditions
+
+![](../../../../public/static/image/docs/configuration/configuration-terms.png)
+
+#### 2) Config [#configuration-2]
+
+Set your device name and preferred keyboard layout.
+Device name allows access using mDNS for example `device-name.local:8080`.
+Keyboard layout is needed for interacting with the system through ssh, or with a keyboard and monitor attached.
+
+Also select your mass storage disk, note this may be different to your installation location and if you plan to sync the Dogecoin blockchain will require plenty of space.
+
+![](../../../../public/static/image/docs/configuration/configuration-config.png)
+
+Advanced options allow you to disable the use of the Dogecoin Foundation's binary caches.
+These binary caches contain pre-build binaries for Dogebox OS and the Foundation's supported Pups, which when used will speed up the installation process.
+
+![](../../../../public/static/image/docs/configuration/configuration-config-advanced.png)
+
+#### 3) Password [#configuration-3]
+
+Set your password, it's used to encrypt your root key and seed phrase so make sure it's secure!
+This password is also used for the Web Admin interface, but not for ssh or commandline login.
+
+![](../../../../public/static/image/docs/configuration/configuration-password.png)
+
+#### 4) Master Key [#configuration-4]
+
+Generate your master key. 
+
+![](../../../../public/static/image/docs/configuration/configuration-masterkey.png)
+
+Ensure it's noted down in a secure location.
+
+![](../../../../public/static/image/docs/configuration/configuration-masterkey-save.png)
+
+#### 5) Connect [#configuration-5]
+
+Select a network for Dogebox to join. This may be ethernet or WiFi.
+You may also add an SSH public key to enable SSH access.
+
+![](../../../../public/static/image/docs/configuration/configuration-connect.png)
+
+#### 6) Complete [#configuration-5]
+
+On pressing 'Much Connect' on the connect screen, your configuration settings will be applied and the device will reboot.
+Once completed, the 'Launch Dogebox' button will be enabled, allowing you to to load the main Dogebox UI.
+
+![](../../../../public/static/image/docs/configuration/configuration-complete.png)
