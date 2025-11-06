@@ -19,138 +19,22 @@ There are 3 repositories that provide the foundational building blocks for Dogeb
 - [Dogeboxd](https://github.com/Dogebox-WG/dogeboxd) - `https://github.com/Dogebox-WG/dogeboxd.git`
 - [DPanel](https://github.com/Dogebox-WG/dpanel) - `https://github.com/Dogebox-WG/dpanel.git`
 - [DKM](https://github.com/Dogebox-WG/dkm) - `https://github.com/Dogebox-WG/dkm.git`
+- [Dev] (https://github.com/Dogebox-WG/dev) - `https://github.com/Dogebox-WG/dev.git`
 
-Please note: `dogeboxd` & `dpanel` must be cloned into the same parent directory. You can clone `DKM` anywhere.
+Please note: `dogeboxd` & `dpanel` must be cloned into the same parent directory. You can clone `DKM` and `dev` anywhere.
 
-### Configure your Nix environment
+### Configure your Nix environment to use flakes
 
-As we're running a development environment, some things must be configured manually.
+As we're using Nix flakes, a script needs to be run that replaces your existing NixOS system configuration with one that uses flakes.
 
-<Accordions>
-  <Accordion title="(1) Configure required packages">
-    Edit `/etc/nixos/configuration.nix`. Inside the main `{ ... }` block, please add:
+Run the following:
+```bash
+cd dev/scripts
+chmod +x flake-me.sh
+./flake-me.sh
+```
 
-    ```nix
-    environment.systemPackages = [ pkgs.git pkgs.vim ];
-    ```
-  </Accordion>
-  <Accordion title="(2) Import dogebox.nix">
-    Edit `/etc/nixos/configuration.nix`. Towards the top of the file there should be an `imports` section.
-
-    Please modify it to conditionally include the `dogebox.nix` file that will live in `$HOME/data/nix/dogebox.nix`
-
-    For example, if your existing imports block looks like:
-
-    ```nix
-      imports =
-        [
-          "${modulesPath}/virtualisation/lxc-container.nix"
-          ./lxd.nix
-        ];
-    ```
-
-    Please change it to:
-
-    ```nix
-      imports =
-        [
-          "${modulesPath}/virtualisation/lxc-container.nix"
-          ./lxd.nix
-        ] ++ lib.optionals (builtins.pathExists "/home/$USER/data/nix/dogebox.nix") [
-          /home/$USER/data/nix/dogebox.nix
-        ];
-    ```
-
-    Where `$USER` is the user you have inside your NixOS VM.
-  </Accordion>
-  <Accordion title="(3) Configure security wrappers">
-    Edit `/etc/nixos/configuration.nix`. Inside the main `{ ... }` block, please add:
-
-    ```nix
-    security.wrappers.dbx = {
-      source = "/home/$USER/dogeboxd/build/dbx";
-      owner = "$USER";
-      group = "users";
-    };
-
-    security.wrappers.dogeboxd = {
-      source = "/home/$USER/dogeboxd/build/dogeboxd";
-      capabilities = "cap_net_bind_service=+ep";
-      owner = "$USER";
-      group = "users";
-    };
-
-    security.wrappers._dbxroot = {
-      source = "/home/$USER/dogeboxd/build/_dbxroot";
-      owner = "root";
-      group = "root";
-      setuid = true;
-    };
-    ```
-
-    **Please note:** Please fix these paths, they assume you have cloned `dogeboxd` into the users home directory. If you cloned them elsewhere, update the paths.
-    **Please note:** There are multiple instances of `$USER` that need replacing, please update all of them.
-  </Accordion>
-  <Accordion title="(4) Enable experimental features">
-    Edit `/etc/nixos/configuration.nix`. Inside the main `{ ... }` block, please add:
-
-    ```nix
-    nix.settings.experimental-features = [ "nix-command" "flakes" ];
-    ```
-  </Accordion>
-</Accordions>
-#### Example modified configuration file
-
-<Accordions>
-  <Accordion title="Example">
-  For a user named `mytestuser`.
-
-  ```nix
-  { lib, config, pkgs, modulesPath, ... }:
-
-  {
-    imports =
-      [
-        ..snip..
-      ] ++ lib.optionals (builtins.pathExists "/home/mytestuser/data/nix/dogebox.nix") [
-        /home/mytestuser/data/nix/dogebox.nix
-      ];
-
-    nix.settings.experimental-features = [ "nix-command" "flakes" ];
-    environment.systemPackages = [ pkgs.git pkgs.vim ];
-
-    security.wrappers.dbx = {
-      source = "/home/mytestuser/dogeboxd/build/dbx";
-      owner = "mytestuser";
-      group = "users";
-    };
-
-    security.wrappers.dogeboxd = {
-      source = "/home/mytestuser/dogeboxd/build/dogeboxd";
-      capabilities = "cap_net_bind_service=+ep";
-      owner = "mytestuser";
-      group = "users";
-    };
-
-    security.wrappers._dbxroot = {
-      source = "/home/mytestuser/dogeboxd/build/_dbxroot";
-      owner = "root";
-      group = "root";
-      setuid = true;
-    };
-
-    .. snip ..
-  };
-    ```
-  </Accordion>
-</Accordions>
-
-
-#### Rebuild
-
-Once you've added the above, you can rebuild your VM to ensure it's in a proper state to execute everything.
-
-Please run: `sudo nixos-rebuild switch`. Assuming this succeeds, you're ready to rock and roll.
+This script will step you through a few questions, please read each carefully.
 
 ### Starting Services
 
