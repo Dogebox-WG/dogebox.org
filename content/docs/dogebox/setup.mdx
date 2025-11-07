@@ -19,23 +19,22 @@ There are 3 repositories that provide the foundational building blocks for Dogeb
 - [Dogeboxd](https://github.com/Dogebox-WG/dogeboxd) - `https://github.com/Dogebox-WG/dogeboxd.git`
 - [DPanel](https://github.com/Dogebox-WG/dpanel) - `https://github.com/Dogebox-WG/dpanel.git`
 - [DKM](https://github.com/Dogebox-WG/dkm) - `https://github.com/Dogebox-WG/dkm.git`
-- [Dev] (https://github.com/Dogebox-WG/dev) - `https://github.com/Dogebox-WG/dev.git`
 
-Please note: `dogeboxd` & `dpanel` must be cloned into the same parent directory. You can clone `DKM` and `dev` anywhere.
+Please note: `dogeboxd` & `dpanel` must be cloned into the same parent directory. You can clone `DKM` anywhere.
 
 ### Configure your Nix environment to use flakes
 
 As we're using Nix flakes, a setup script needs to be run that replaces your existing NixOS system configuration with one that uses flakes.
-This also configures some other requirements like enabling experimental features.
+This will be done by the setup script, it will also adjust some other configurations like enabling experimental features.
 
-Run the following:
+Run the following within your NixOS environment:
 ```bash
-cd dev/scripts
-chmod +x setup.sh
-./setup.sh
+nix run github:dogebox-wg/dev/#setup \
+  --extra-experimental-features nix-command \
+  --extra-experimental-features flakes
 ```
 
-This script will step you through a few questions, please read each carefully.
+This script will step you through a few questions, please read each of them carefully.
 
 ### Starting Services
 
