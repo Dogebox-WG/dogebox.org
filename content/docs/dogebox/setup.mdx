@@ -25,13 +25,14 @@ Please note: `dogeboxd` & `dpanel` must be cloned into the same parent directory
 
 ### Configure your Nix environment to use flakes
 
-As we're using Nix flakes, a script needs to be run that replaces your existing NixOS system configuration with one that uses flakes.
+As we're using Nix flakes, a setup script needs to be run that replaces your existing NixOS system configuration with one that uses flakes.
+This also configures some other requirements like enabling experimental features.
 
 Run the following:
 ```bash
 cd dev/scripts
-chmod +x flake-me.sh
-./flake-me.sh
+chmod +x setup.sh
+./setup.sh
 ```
 
 This script will step you through a few questions, please read each carefully.
