@@ -23,7 +23,7 @@ export default function HomePage() {
             href="https://dogebox.dogecoin.org/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex flex-col items-center p-8 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300"
+            className="flex flex-col items-center p-8  rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300"
           >
             <div className="h-48 flex items-center justify-center mb-4">
               <Image 
@@ -39,7 +39,7 @@ export default function HomePage() {
           
           <Link 
             href="/docs/usage"
-            className="flex flex-col items-center p-8 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300"
+            className="flex flex-col items-center p-8  rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300"
           >
             <div className="h-48 flex items-center justify-center mb-4">
               <Image
@@ -57,7 +57,7 @@ export default function HomePage() {
             href="https://discord.gg/VEUMWpThg9"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex flex-col items-center p-8 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300"
+            className="flex flex-col items-center p-8  rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300"
           >
             <div className="h-48 flex items-center justify-center mb-4">
               <Image 
