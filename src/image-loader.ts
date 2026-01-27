@@ -1,4 +1,4 @@
-export default function loader({ src, width, quality }: { src: string; width?: number; quality?: number }) {
+export default function loader({ src }: { src: string }) {
   // For static export, just return the src as-is
   return src;
 }
