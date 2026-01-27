@@ -47,13 +47,13 @@ export function GitHubReleases() {
 
   if (loading) {
     return (
-      <div className="border border-gray-200 rounded-lg p-6 animate-pulse">
-        <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
-        <div className="h-4 bg-gray-200 rounded w-1/4 mb-6"></div>
+      <div className="border border-gray-200 dark:border-neutral-700 rounded-lg p-6 animate-pulse">
+        <div className="h-8 bg-gray-200 dark:bg-neutral-700 rounded w-1/3 mb-4"></div>
+        <div className="h-4 bg-gray-200 dark:bg-neutral-700 rounded w-1/4 mb-6"></div>
         <div className="space-y-3">
-          <div className="h-4 bg-gray-200 rounded"></div>
-          <div className="h-4 bg-gray-200 rounded"></div>
-          <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+          <div className="h-4 bg-gray-200 dark:bg-neutral-700 rounded"></div>
+          <div className="h-4 bg-gray-200 dark:bg-neutral-700 rounded"></div>
+          <div className="h-4 bg-gray-200 dark:bg-neutral-700 rounded w-5/6"></div>
         </div>
       </div>
     );
@@ -61,8 +61,8 @@ export function GitHubReleases() {
 
   if (error) {
     return (
-      <div className="border border-red-200 bg-red-50 rounded-lg p-6">
-        <p className="text-red-600">Error loading release: {error}</p>
+      <div className="border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 rounded-lg p-6">
+        <p className="text-red-600 dark:text-red-400">Error loading release: {error}</p>
       </div>
     );
   }
@@ -159,17 +159,17 @@ export function GitHubReleases() {
           const getAlertStyle = (type: string) => {
             switch (type) {
               case 'NOTE':
-                return { container: 'border-blue-200 bg-blue-50', icon: '📝', iconColor: 'text-blue-600', title: 'text-blue-800' };
+                return { container: 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20', icon: '📝', iconColor: 'text-blue-600 dark:text-blue-400', title: 'text-blue-800 dark:text-blue-300' };
               case 'TIP':
-                return { container: 'border-green-200 bg-green-50', icon: '💡', iconColor: 'text-green-600', title: 'text-green-800' };
+                return { container: 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20', icon: '💡', iconColor: 'text-green-600 dark:text-green-400', title: 'text-green-800 dark:text-green-300' };
               case 'IMPORTANT':
-                return { container: 'border-purple-200 bg-purple-50', icon: '❗', iconColor: 'text-purple-600', title: 'text-purple-800' };
+                return { container: 'border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20', icon: '❗', iconColor: 'text-purple-600 dark:text-purple-400', title: 'text-purple-800 dark:text-purple-300' };
               case 'WARNING':
-                return { container: 'border-yellow-200 bg-yellow-50', icon: '⚠️', iconColor: 'text-yellow-600', title: 'text-yellow-800' };
+                return { container: 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20', icon: '⚠️', iconColor: 'text-yellow-600 dark:text-yellow-400', title: 'text-yellow-800 dark:text-yellow-300' };
               case 'CAUTION':
-                return { container: 'border-red-200 bg-red-50', icon: '🚨', iconColor: 'text-red-600', title: 'text-red-800' };
+                return { container: 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20', icon: '🚨', iconColor: 'text-red-600 dark:text-red-400', title: 'text-red-800 dark:text-red-300' };
               default:
-                return { container: 'border-gray-200 bg-gray-50', icon: 'ℹ️', iconColor: 'text-gray-600', title: 'text-gray-800' };
+                return { container: 'border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-800', icon: 'ℹ️', iconColor: 'text-gray-600 dark:text-gray-400', title: 'text-gray-800 dark:text-gray-200' };
             }
           };
 
@@ -180,7 +180,7 @@ export function GitHubReleases() {
               <span class="${style.iconColor}">${style.icon}</span>
               <span class="font-semibold ${style.title}">${alertType}</span>
             </div>
-            <div class="text-sm">ALERT_CONTENT_${cleanContent}_ALERT_CONTENT</div>
+            <div class="text-sm text-gray-700 dark:text-gray-300">ALERT_CONTENT_${cleanContent}_ALERT_CONTENT</div>
           </div>`);
           
           // Don't increment i here as it's already at the next non-alert line
@@ -198,23 +198,23 @@ export function GitHubReleases() {
     // Now process regular markdown
     return processedText
       // Convert headers
-      .replace(/^### (.*$)/gm, '<h3 class="text-lg font-semibold mt-4 mb-2">$1</h3>')
-      .replace(/^## (.*$)/gm, '<h2 class="text-xl font-bold mt-6 mb-3">$1</h2>')
-      .replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold mt-6 mb-4">$1</h1>')
+      .replace(/^### (.*$)/gm, '<h3 class="text-lg font-semibold mt-4 mb-2 text-gray-900 dark:text-gray-100">$1</h3>')
+      .replace(/^## (.*$)/gm, '<h2 class="text-xl font-bold mt-6 mb-3 text-gray-900 dark:text-gray-100">$1</h2>')
+      .replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold mt-6 mb-4 text-gray-900 dark:text-gray-100">$1</h1>')
       // Convert bold text
       .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>')
       // Convert italic text
       .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
       // Convert code blocks
-      .replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-100 p-3 rounded text-sm overflow-x-auto my-2"><code>$1</code></pre>')
+      .replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-100 dark:bg-neutral-800 p-3 rounded text-sm overflow-x-auto my-2"><code>$1</code></pre>')
       // Convert inline code
-      .replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-sm">$1</code>')
+      .replace(/`([^`]+)`/g, '<code class="bg-gray-100 dark:bg-neutral-800 px-1 py-0.5 rounded text-sm">$1</code>')
       // Convert markdown links first
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer">$1</a>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer">$1</a>')
       // Convert plain URLs to links (avoiding already linked URLs)
-      .replace(/(^|[^">])(https?:\/\/[^\s<>"']+)/g, '$1<a href="$2" class="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer">$2</a>')
+      .replace(/(^|[^">])(https?:\/\/[^\s<>"']+)/g, '$1<a href="$2" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer">$2</a>')
       // Convert GitHub usernames (@username) to links
-      .replace(/(^|[^a-zA-Z0-9])@([a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38})/g, '$1<a href="https://github.com/$2" class="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer">@$2</a>')
+      .replace(/(^|[^a-zA-Z0-9])@([a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38})/g, '$1<a href="https://github.com/$2" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer">@$2</a>')
       // Convert bullet points
       .replace(/^[\s]*[-*+][\s]+(.*$)/gm, '<li class="ml-4">$1</li>')
       // Wrap consecutive list items in ul tags
@@ -223,19 +223,19 @@ export function GitHubReleases() {
       .replace(/ALERT_CONTENT_([\s\S]*?)_ALERT_CONTENT/g, (match, content) => {
         return content
           // Convert headers
-          .replace(/^### (.*$)/gm, '<h3 class="text-lg font-semibold mt-2 mb-1">$1</h3>')
-          .replace(/^## (.*$)/gm, '<h2 class="text-xl font-bold mt-2 mb-1">$1</h2>')
-          .replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold mt-2 mb-1">$1</h1>')
+          .replace(/^### (.*$)/gm, '<h3 class="text-lg font-semibold mt-2 mb-1 text-gray-900 dark:text-gray-100">$1</h3>')
+          .replace(/^## (.*$)/gm, '<h2 class="text-xl font-bold mt-2 mb-1 text-gray-900 dark:text-gray-100">$1</h2>')
+          .replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold mt-2 mb-1 text-gray-900 dark:text-gray-100">$1</h1>')
           // Convert bold text
           .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>')
           // Convert italic text
           .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
           // Convert links
-          .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer">$1</a>')
+          .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer">$1</a>')
           // Convert plain URLs
-          .replace(/(^|[^">])(https?:\/\/[^\s<>"']+)/g, '$1<a href="$2" class="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer">$2</a>')
+          .replace(/(^|[^">])(https?:\/\/[^\s<>"']+)/g, '$1<a href="$2" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer">$2</a>')
           // Convert GitHub usernames (@username) to links
-          .replace(/(^|[^a-zA-Z0-9])@([a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38})/g, '$1<a href="https://github.com/$2" class="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer">@$2</a>')
+          .replace(/(^|[^a-zA-Z0-9])@([a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38})/g, '$1<a href="https://github.com/$2" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer">@$2</a>')
           // Convert simple line breaks to paragraphs
           .split('\n\n')
           .map((paragraph: string) => paragraph.trim())
@@ -263,18 +263,18 @@ export function GitHubReleases() {
   };
 
   return (
-    <div className="border border-gray-200 rounded-lg p-6 mb-6 bg-white shadow-sm">
+    <div className="border border-gray-200 dark:border-neutral-700 rounded-lg p-6 mb-6 bg-white dark:bg-neutral-800 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-2xl font-bold flex items-center gap-2">
+          <h3 className="text-2xl font-bold flex items-center gap-2 text-gray-900 dark:text-gray-100">
             {release.name || release.tag_name}
-            <span className="text-gray-500 text-lg">🏷️</span>
+            <span className="text-gray-500 dark:text-gray-400 text-lg">🏷️</span>
           </h3>
-          <p className="text-gray-600 flex items-center gap-2 mt-1">
+          <p className="text-gray-600 dark:text-gray-300 flex items-center gap-2 mt-1">
             <span>📅</span>
             Released on {formatDate(release.published_at)}
             {getDaysAgo(release.published_at) > 0 && (
-              <span className="text-gray-500 text-sm"> ({getDaysAgo(release.published_at)} days ago)</span>
+              <span className="text-gray-500 dark:text-gray-400 text-sm"> ({getDaysAgo(release.published_at)} days ago)</span>
             )}
           </p>
         </div>
@@ -282,7 +282,7 @@ export function GitHubReleases() {
           href={release.html_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors no-underline"
+          className="flex items-center gap-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 transition-colors no-underline"
           style={{ textDecoration: 'none' }}
         >
           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -294,16 +294,16 @@ export function GitHubReleases() {
 
       {release.body && (
         <div className="mb-6">
-          <h4 className="text-lg font-semibold mb-3">Release Notes</h4>
+          <h4 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">Release Notes</h4>
           <div 
-            className="prose prose-sm max-w-none text-gray-700"
+            className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300"
             dangerouslySetInnerHTML={{ __html: parseMarkdown(release.body) }}
           />
         </div>
       )}
 
       <div className="mt-6">
-        <h4 className="text-lg font-semibold mb-3 flex items-center gap-2">
+        <h4 className="text-lg font-semibold mb-3 flex items-center gap-2 text-gray-900 dark:text-gray-100">
           <span>💾</span>
           Available Downloads
         </h4>
@@ -312,18 +312,18 @@ export function GitHubReleases() {
           {release.assets.map((asset) => (
             <div
               key={asset.name}
-              className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group"
+              className="flex items-center justify-between p-4 border border-gray-200 dark:border-neutral-700 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700 transition-colors group"
             >
               <div className="flex items-center gap-3">
                 <span className="text-2xl group-hover:scale-110 transition-transform">
                   {getFileIcon(asset.name)}
                 </span>
                 <div>
-                  <p className="font-medium text-gray-900">{asset.name}</p>
+                  <p className="font-medium text-gray-900 dark:text-gray-100">{asset.name}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-500">{formatFileSize(asset.size)}</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">{formatFileSize(asset.size)}</span>
                 <a
                   href={asset.browser_download_url}
                   download
@@ -339,7 +339,7 @@ export function GitHubReleases() {
         </div>
         
         {release.assets.length === 0 && (
-          <p className="text-gray-500 italic">No downloads available for this release.</p>
+          <p className="text-gray-500 dark:text-gray-400 italic">No downloads available for this release.</p>
         )}
       </div>
     </div>
