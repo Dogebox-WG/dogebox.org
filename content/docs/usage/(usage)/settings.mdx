@@ -2,6 +2,8 @@
 title: Settings
 ---
 
+From the settings screen the following options are available.
+
 # Remote Access
 
 Manage SSH access through public keys.
@@ -16,9 +18,16 @@ Before importing the Blockchain make sure the Dogecoin Core pup is installed.
 The pup can be stopped so it doesn't try to download the blockchain itself
 before importing the blockchain from an external drive.
 
+## Prepare the Blockchain Backup Drive
+
+Make sure you have the blockchain backup drive ready.
+
+The Blockchain Backup Drive is an external USB Device containing a complete snapshot of the Dogecoin
+blockchain at a given point in time. It can be obtained by backing up the block
+
 ## On Dogebox
 
- 1. Plug in the Blockchain Drive
+ 1. Plug in the Blockchain Backup Drive into the an available USB port
  2. Press the import Blockchain button
  3. Wait for the progress indicator to show the import finished
  4. Re-enable Dogecoin Core if you had stopped it previously
@@ -27,25 +36,3 @@ before importing the blockchain from an external drive.
 
 In general, if you can expose a connected USB Drive directly to the Dogebox OS,
 then the import process should be able to see the blockchain data and import it.
-
-Below we have collected specific guides for a few different VM Host software.
-
-### UTM
-
-UTM is a virtual machine host software for macOS. It inherits some of the
-limitations of the platform so getting the blockchain into the Dogebox OS is a
-little more involved.
-
-[TBD]
-
-### Virtualbox
-
-[TBD]
-
-### Hyper-V
-
-[TBD]
-
-### Proxmox
-
-[TBD]
